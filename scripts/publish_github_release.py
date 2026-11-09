@@ -23,6 +23,10 @@ def main():
  index=folder/'distribution-manifest.json'
  asset_rows.append({'name':index.name,'bytes':index.stat().st_size,'sha256':hashlib.sha256(index.read_bytes()).hexdigest()})
  assert all(row['bytes']<2*1024**3 for row in asset_rows)
+ from scripts.release_page import render as render_release_page
+ notes=(ROOT/('docs/RELEASE_NOTES_'+version+'.md')).read_text(encoding='utf-8')
+ notes=re.sub(r'\]\(([A-Za-z0-9_.-]+\.md)\)',lambda m:'](https://github.com/'+REPO+'/blob/'+tag+'/docs/'+m[1]+')',notes)
+ page=render_release_page(REPO,version,asset_rows,notes)
  token=credentials()
  with httpx.Client(headers={'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},trust_env=False,follow_redirects=False,timeout=60) as c:
   def api(method,path,**kw):
@@ -64,10 +68,7 @@ def main():
    sha=git('rev-list','-n','1',tag).stdout.strip()
   git('push','origin',tag)
   print(json.dumps({'phase':'source_pushed','commit':sha,'tag':tag,'files':len(allowed)}),flush=True)
-  notes=(ROOT/('docs/RELEASE_NOTES_'+version+'.md')).read_text(encoding='utf-8')
-  notes=re.sub(r'\]\(([A-Za-z0-9_.-]+\.md)\)',lambda m:'](https://github.com/'+REPO+'/blob/'+tag+'/docs/'+m[1]+')',notes)
-  notes+='\n\n## Скачать\n\nLite: ZIP + .sha256. Full: обе Full.zip.partNN, Full.parts.json и assemble_full.py в одну папку; python assemble_full.py PSLC-Agent-'+version+'-Full.parts.json. Затем распакуйте ZIP, откройте START_HERE.md. Доступ к этим загрузкам требует входа в приватный репозиторий.\n\n## SHA256 поставок\n\n'
-  for row in manifest['packages']:notes+='- '+row['variant']+': '+str(row['bytes'])+' bytes; \x60'+row['sha256']+'\x60\n'
+  notes=page
   matches=[x for x in api('GET','/repos/'+REPO+'/releases?per_page=100') if x['tag_name']==tag]
   assert len(matches)<=1,'Duplicate release drafts'
   if matches:release=matches[0]
