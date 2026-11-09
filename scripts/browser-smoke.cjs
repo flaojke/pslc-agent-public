@@ -1,0 +1,41 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+const { chromium } = require(process.env.PSLC_PLAYWRIGHT_MODULE || 'playwright');
+(async()=>{
+ const root=path.resolve(__dirname,'..');
+ const settings=JSON.parse(fs.readFileSync(path.join(root,'.local/settings.json'),'utf8'));
+ const out=path.join(root,'docs/qa/current/screenshots'); fs.mkdirSync(out,{recursive:true});
+ const browser=await chromium.launch({channel:'msedge',headless:true});
+ try {
+  const page=await browser.newPage({viewport:{width:1440,height:1000}});
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('http://127.0.0.1:8787');
+  await page.locator('#token').fill(settings.operator_token);
+  await page.getByRole('button',{name:'Открыть рабочее место'}).click();
+  await page.getByRole('heading',{name:'Основной раздел',exact:true}).waitFor();
+  await page.locator('nav button').filter({hasText:'Устройства'}).click();
+  await page.getByRole('heading',{name:'Парк устройств'}).waitFor();
+  await page.locator('tbody tr').first().waitFor();
+  await page.screenshot({path:path.join(out,'01-devices.png'),fullPage:true});
+  await page.locator('tbody tr').first().getByRole('button',{name:'Открыть'}).click();
+  await page.getByRole('button',{name:'Создать проверку состояния'}).click();
+  await page.locator('.plan .status').filter({hasText:'Проверка завершена'}).waitFor({timeout:15000});
+  await page.screenshot({path:path.join(out,'02-chat.png'),fullPage:true});
+  await page.locator('nav button').nth(2).click();
+  await page.locator('.timeline .event').first().waitFor();
+  await page.screenshot({path:path.join(out,'03-events.png'),fullPage:true});
+  await page.locator('nav button').nth(3).click();
+  await page.getByRole('heading',{name:'Проверенные знания рядом с задачей'}).waitFor();
+  await page.screenshot({path:path.join(out,'04-knowledge.png'),fullPage:true});
+  const desktopOverflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth);
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:path.join(out,'05-mobile.png'),fullPage:true});
+  const mobileOverflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth);
+  assert.equal(desktopOverflow,false,'Desktop horizontal overflow');
+  assert.equal(mobileOverflow,false,'Mobile horizontal overflow');
+  assert.deepEqual(errors,[],'Runtime page errors');
+  fs.writeFileSync(path.join(root,'docs/qa/current/browser-smoke.json'),JSON.stringify({pages:4,screenshots:5,desktopOverflow,mobileOverflow,pageErrors:errors,realHealthTaskViaUI:true,browser:'headless Microsoft Edge'},null,2));
+  console.log('Browser smoke passed: four pages, actual health task, desktop/mobile, no page errors.');
+ } finally {await browser.close();}
+})().catch(e=>{console.error(e.message);process.exit(1)});

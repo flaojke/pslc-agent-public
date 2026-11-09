@@ -1,0 +1,21 @@
+node_modules/
+.venv/
+.local/
+.env
+*.sqlite*
+__pycache__/
+.pytest_cache/
+frontend/dist/
+*.egg-info/
+
+artifacts/
+build/
+*.spec
+
+/models/
+/runtime/
+
+# Local verification artifacts are not public source.
+docs/qa/
+docs/roadmap/
+release-dashboards/

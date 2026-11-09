@@ -1,0 +1,18 @@
+schema: spec-driven
+context: |
+  Project: PSLC Agent, an experimental Windows/Linux support and administration tool.
+  Language: Russian. Structural OpenSpec headings and SHALL/MUST stay English.
+  Read accepted technical contracts in openspec/specs and the current code.
+  Preserve explicit authorization, scoped execution, independent local opt-ins and fail-closed behavior.
+  Raw logs, command output and model context stay in bounded volatile memory.
+  Product help is generated from docs/product-guides.json.
+  Do not store credentials, local environment evidence or private correspondence in Git.
+rules:
+  proposal:
+    - State the exact change scope and distinguish implemented behavior from future work.
+  specs:
+    - Use observable WHEN/THEN scenarios and stable requirement IDs.
+  design:
+    - Address trust boundaries, retention, recovery, concurrency and migration.
+  tasks:
+    - Record checks honestly; fixture tests do not prove production acceptance.

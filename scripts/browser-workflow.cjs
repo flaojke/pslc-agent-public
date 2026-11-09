@@ -1,0 +1,44 @@
+const fs=require('node:fs');const path=require('node:path');const assert=require('node:assert/strict');
+const {chromium}=require(process.env.PSLC_PLAYWRIGHT_MODULE||'playwright');
+(async()=>{
+ const root=path.resolve(__dirname,'..');const fixture=JSON.parse(fs.readFileSync(path.join(root,'.local/workflow-browser-qa.json'),'utf8'));
+ const out=path.join(root,'docs/qa/main-agent-workflow/screenshots');fs.mkdirSync(out,{recursive:true});
+ const browser=await chromium.launch({channel:'msedge',headless:true});const errors=[];
+ try{
+  const page=await browser.newPage({viewport:{width:1440,height:1000}});page.on('pageerror',e=>errors.push(e.message));
+  const login=async()=>{await page.locator('#token').fill(fixture.token);await page.getByRole('button',{name:'Открыть рабочее место'}).click();await page.getByRole('heading',{name:'Основной раздел',exact:true}).waitFor();await page.getByRole('button',{name:'Проверить workflow-qa-fixture',exact:true}).waitFor();};
+  const status=()=>page.getByTestId('workflow-status');
+  const prepare=async text=>{await page.getByLabel('Задание агенту',{exact:true}).fill(text);await page.getByRole('button',{name:'Подготовить план',exact:false}).click();await status().filter({hasText:'Нужно ваше подтверждение'}).waitFor();};
+  const json=async endpoint=>{const response=await page.request.get(fixture.url+'/api'+endpoint,{headers:{Authorization:'Bearer '+fixture.token}});assert(response.ok());return response.json();};
+  await page.goto(fixture.url);await login();assert.equal(await page.locator('textarea').count(),1);
+  await page.screenshot({path:path.join(out,'00-main.png'),fullPage:true});
+  await prepare('Проверь состояние узла workflow-qa-fixture');assert.equal((await json('/overview')).statistics.active_fleet,0);
+  assert((await json('/tasks')).every(t=>t.state==='awaiting_confirmation'));
+  await page.screenshot({path:path.join(out,'01-plan.png'),fullPage:true});
+  await page.getByRole('button',{name:'Отклонить план',exact:true}).click();await status().filter({hasText:'План отклонён'}).waitFor();
+  await prepare('Проверь состояние узла workflow-qa-fixture');await page.getByRole('button',{name:'Подтвердить весь план',exact:true}).click();await status().filter({hasText:'Результат проверен'}).waitFor({timeout:15000});
+  await page.getByText('CPU, %',{exact:true}).waitFor();await page.screenshot({path:path.join(out,'02-health-verified.png'),fullPage:true});
+  await prepare(fixture.command_prompt);await page.getByText('Основная команда · python',{exact:true}).waitFor();
+  await page.screenshot({path:path.join(out,'03-command-plan.png'),fullPage:true});assert.equal(fs.existsSync(fixture.proof_file),false);
+  await page.getByRole('button',{name:'Подтвердить весь план',exact:true}).click();await status().filter({hasText:'Результат проверен'}).waitFor({timeout:15000});
+  assert.equal(fs.readFileSync(fixture.proof_file,'utf8'),fixture.marker);await page.getByText('Постусловие совпало',{exact:true}).waitFor();
+  await page.screenshot({path:path.join(out,'04-command-verified.png'),fullPage:true});
+  const taskCount=(await json('/tasks')).length;
+  await page.getByLabel('Задание агенту',{exact:true}).fill('Проверь состояние');await page.getByRole('button',{name:'Подготовить план'}).click();await status().filter({hasText:'Нужно уточнение'}).waitFor();
+  assert.equal((await json('/tasks')).length,taskCount);await page.screenshot({path:path.join(out,'05-clarification.png'),fullPage:true});
+  const history=await json('/workflows');assert(!JSON.stringify(history).includes(fixture.marker));assert(!fs.readFileSync(path.join(fixture.directory,'qa.sqlite3')).includes(Buffer.from(fixture.marker)));
+  await page.reload();await login();assert.equal(await page.getByText(fixture.marker,{exact:true}).count(),0);
+  await prepare('Проверь состояние узла workflow-qa-fixture');await page.reload();await login();
+  await status().filter({hasText:'Нужно ваше подтверждение'}).waitFor();assert.equal(await page.locator('.workflow-plan-step').count(),0);
+  assert.equal(await page.getByRole('button',{name:'Подтвердить весь план'}).isDisabled(),true);
+  await page.screenshot({path:path.join(out,'08-reload-metadata.png'),fullPage:true});
+  await prepare('Проверь состояние узла workflow-qa-fixture');await status().filter({hasText:'План истёк'}).waitFor({timeout:20000});
+  assert.equal(await page.getByRole('button',{name:'Подтвердить весь план'}).count(),0);await page.screenshot({path:path.join(out,'06-expired.png'),fullPage:true});
+  await prepare('Проверь состояние узла workflow-qa-fixture');await page.setViewportSize({width:390,height:844});assert.equal(await page.locator('textarea').count(),1);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:path.join(out,'07-mobile-plan.png'),fullPage:true});
+  await page.getByRole('button',{name:'Отклонить план',exact:true}).click();
+  assert.deepEqual(errors,[]);
+  const report={isolatedFixture:true,realModel:false,realSoftwareInstalled:false,onePrompt:true,noExecutionBeforeApproval:true,rejection:true,healthVerified:true,realTemporaryFileCommand:true,postconditionVerified:true,clarificationNoJobs:true,expiry:true,reloadMetadataOnly:true,pendingReloadDisablesConfirmation:true,rawMarkerAbsentDatabase:true,mobileHorizontalOverflow:false,pageErrors:errors,screenshots:9};
+  fs.writeFileSync(path.join(root,'docs/qa/main-agent-workflow/browser.json'),JSON.stringify(report,null,2));console.log('Browser QA passed: request, plan, rejection/approval, execution, postcheck, clarification, expiry, metadata reload, mobile.');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e.message);process.exit(1)});

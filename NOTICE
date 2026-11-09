@@ -1,0 +1,12 @@
+PSLC Agent
+Copyright 2026 PSLC Agent contributors
+
+Licensed under the Apache License, Version 2.0.
+Third-party components retain their own copyright notices and licenses.
+See licenses/ and the upstream notices for any separately obtained runtime,
+native dependency, or model weights. Apache-2.0 for this repository does not
+relicense those components or grant rights to third-party trademarks.
+
+Generated OpenSpec development skills in .agents/skills/openspec-*/ derive
+from @fission-ai/openspec 1.15.0 (OpenSpec Contributors, 2024), MIT licensed.
+The original copyright and permission notice is in licenses/OpenSpec-MIT.txt.

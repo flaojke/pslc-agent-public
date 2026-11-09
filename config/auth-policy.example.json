@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "subjects": {},
+  "groups": {
+    "PSLC-IT": {
+      "roles": [
+        "operator"
+      ],
+      "device_ids": [
+        "pilot-node-01"
+      ],
+      "knowledge_spaces": [
+        "IT"
+      ]
+    },
+    "PSLC-IB": {
+      "roles": [
+        "auditor"
+      ],
+      "device_ids": [
+        "pilot-node-01"
+      ],
+      "knowledge_spaces": [
+        "IT"
+      ]
+    },
+    "PSLC-Knowledge-Review": {
+      "roles": [
+        "reviewer"
+      ],
+      "device_ids": [],
+      "knowledge_spaces": [
+        "IT"
+      ]
+    }
+  }
+}

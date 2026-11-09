@@ -1,0 +1,13 @@
+[project]
+name = "pslc-agent"
+version = "0.18.0"
+license = "Apache-2.0"
+requires-python = ">=3.12"
+dependencies = ["fastapi==0.162.2", "uvicorn==0.54.0", "sqlalchemy==2.1.8", "psycopg[binary]==3.3.8", "httpx==0.28.1", "psutil==7.2.2", "PyJWT==2.15.1", "cryptography==50.0.2"]
+
+[project.optional-dependencies]
+build = ["pyinstaller==6.22.3", "pywin32==312; sys_platform == 'win32'"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

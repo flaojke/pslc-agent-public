@@ -1,0 +1,1 @@
+Qwen3.5 models by Alibaba Qwen Team. Q4_K_M quantization distributed by Unsloth AI. Weights under Apache-2.0. Exact revisions/source URLs/sizes/SHA256: config/local-models.json. llama.cpp CPU runtime from ggml-org/llama.cpp; original license included. Runtime sources/archive digests: config/local-runtime.json. No endorsement implied.

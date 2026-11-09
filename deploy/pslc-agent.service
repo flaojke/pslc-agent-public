@@ -1,0 +1,26 @@
+[Unit]
+Description=PSLC Agent node executor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pslc-agent
+Group=pslc-agent
+WorkingDirectory=/var/lib/pslc-agent
+ExecStart=/opt/pslc-agent/versions/0.8.0/pslc-agent --config /etc/pslc-agent/agent-config.json
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=2100
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/pslc-agent
+UMask=0077
+LimitCORE=0
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target

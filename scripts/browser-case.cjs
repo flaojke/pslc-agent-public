@@ -1,0 +1,45 @@
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {chromium}=require(process.env.PSLC_PLAYWRIGHT_MODULE||'playwright');
+(async()=>{
+ const root=path.resolve(__dirname,'..'),qa=JSON.parse(fs.readFileSync(path.join(root,'.local/case-browser-qa.json'),'utf8'));
+ const out=path.join(root,'docs/qa/dialogue-case-workspace');fs.mkdirSync(path.join(out,'screenshots'),{recursive:true});
+ const browser=await chromium.launch({channel:'msedge',headless:true});const page=await browser.newPage({viewport:{width:1440,height:1080}});
+ page.setDefaultTimeout(15000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const shot=async name=>page.screenshot({path:path.join(out,'screenshots',name+'.png'),fullPage:true});
+ const api=async(route,body)=>{const r=body===undefined?await page.request.get(qa.url+'/api'+route):await page.request.post(qa.url+'/api'+route,{data:body,headers:{Origin:qa.url}});assert(r.ok(),await r.text());return r.json();};
+ try{
+ await page.goto(qa.url);await page.getByLabel('Логин',{exact:true}).fill('admin');await page.getByLabel('Пароль',{exact:true}).fill('admin');await page.getByRole('button',{name:'Войти в систему',exact:false}).click();
+ await page.getByRole('heading',{name:'Основной раздел',exact:true}).waitFor();await page.locator('.new-conversation').waitFor();
+ assert.equal(await page.locator('textarea').count(),1);await shot('00-main-empty');
+ await page.locator('.new-conversation').click();await page.getByRole('button',{name:'Переименовать',exact:true}).waitFor();
+ await page.getByRole('button',{name:'Переименовать',exact:true}).click();await page.getByLabel('Короткое имя беседы', {exact:false}).fill('Проблема ПК-128');await page.getByRole('button',{name:'Сохранить имя'}).click();
+ await page.getByLabel('Целевые машины',{exact:true}).selectOption('workstations');await page.getByRole('button',{name:'Цели: 3 · показать список'}).waitFor();
+ await page.getByLabel('Сообщение агенту',{exact:true}).fill('QA-DIALOGUE-RAW-4891: служба остановлена, помоги разобраться');await page.getByRole('button',{name:'Отправить →',exact:true}).waitFor({state:'visible'});await page.waitForFunction(()=>!document.querySelector('.case-composer button[type=submit]').disabled);await page.getByLabel('Сообщение агенту',{exact:true}).press('Control+Enter');
+ await page.locator('.agent-message').filter({hasText:'Учтено сообщений в этой беседе: 1'}).waitFor();
+ await page.getByLabel('Сообщение агенту',{exact:true}).fill('Какая следующая проверка?');await page.getByRole('button',{name:'Отправить →',exact:true}).click();
+ await page.locator('.agent-message').filter({hasText:'Учтено сообщений в этой беседе: 2'}).waitFor();await shot('01-multi-turn-dialogue');
+ await page.getByLabel('Сообщение агенту',{exact:true}).fill('Проверь состояние всех машин');await page.getByRole('button',{name:'Подготовить план',exact:true}).click();
+ await page.getByRole('button',{name:'Подтвердить на 3 устройствах',exact:true}).waitFor();
+ assert.equal((await api('/overview')).statistics.active_fleet,0);
+ const chats=await api('/conversations');const cid=chats.find(c=>c.title==='Проблема ПК-128').id;const convo=await api('/conversations/'+cid);const flow=convo.turns.find(t=>t.workflow).workflow;
+ assert.equal(flow.steps.length,3);assert.equal(flow.source,'approved_template');await shot('02-exact-group-plan');
+ await page.getByRole('button',{name:'Подтвердить на 3 устройствах',exact:true}).click();
+ await page.locator('.case-results h3').filter({hasText:'3/3 шагов проверено'}).waitFor();await page.locator('.phase-facts>summary').click();await shot('03-verified-facts');
+ const verified=(await api('/conversations/'+cid)).turns.find(t=>t.workflow).workflow;assert.equal(verified.state,'verified');
+ await page.locator('.new-conversation').click();await page.getByRole('button',{name:'Переименовать',exact:true}).click();await page.getByLabel('Короткое имя беседы',{exact:false}).fill('Логи парка');await page.getByRole('button',{name:'Сохранить имя'}).click();
+ assert.equal(await page.locator('.user-message').count(),0);await page.getByLabel('Сообщение агенту',{exact:true}).fill('Отмена ответа');await page.getByRole('button',{name:'Отправить →',exact:true}).click();
+ await page.getByRole('button',{name:'Остановить ответ',exact:true}).click();await page.waitForTimeout(1500);assert(!await page.getByText('LATE-FIXTURE-REPLY',{exact:true}).count());
+ await page.getByRole('button',{name:'Устройства',exact:false}).filter({has:page.locator('b')}).click();
+ await shot('04-device-management');
+ await page.getByRole('button',{name:'Настройка модели',exact:true}).click();await page.getByRole('heading',{name:'Настройка модели',exact:true}).waitFor();await shot('05-model-settings');
+ await page.getByRole('button',{name:'Основной раздел',exact:false}).click();await page.locator('#case-message').waitFor();
+ await page.setViewportSize({width:390,height:844});await shot('06-mobile-main');
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
+ await page.setViewportSize({width:320,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
+ await page.getByLabel('Сообщение агенту',{exact:true}).focus();await page.keyboard.press('Tab');const focus=await page.evaluate(()=>{const e=document.activeElement;const s=getComputedStyle(e);return {tag:e.tagName,outline:s.outlineStyle,width:s.outlineWidth};});assert.notEqual(focus.outline,'none');
+ const q=(await page.request.get(qa.url+'/qa/status')).json();const meta=await q;assert(meta.multi_turn_seen);assert(meta.health_jobs>=3);assert.equal(errors.length,0);
+ const db=path.join(qa.directory,'qa.sqlite3');assert(!fs.readFileSync(db).includes(Buffer.from('QA-DIALOGUE-RAW-4891')));
+ const result={scope:'synthetic model/device browser fixture',realCPUInference:false,realHostCommands:false,multiTurn:true,independentChats:true,targetsPCOnly:3,planBeforeConfirmNoExecution:true,exactConfirmedHealth:true,lateCancelledAnswerDiscarded:true,oneComposer:true,keyboardFocus:focus,mobileWidths:[390,320],overflow:false,pageErrors:errors,metadataOnly:true};
+ fs.writeFileSync(path.join(out,'browser.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
+ }catch(e){await shot('failure');console.error('DOM',await page.locator('body').innerText({timeout:1000}));throw e;}finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exit(1);});

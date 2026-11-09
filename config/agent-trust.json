@@ -1,0 +1,4 @@
+{
+  "scope": "QA-only; not corporate trust",
+  "public_pem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEANvhBhXEBJV1DaINlnO43BIpOtMd6+iV+j9zfsCEVcLs=\n-----END PUBLIC KEY-----\n"
+}

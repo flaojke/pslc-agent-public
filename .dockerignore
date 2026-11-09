@@ -1,0 +1,12 @@
+**
+!agent/
+!agent/**
+!backend/
+!backend/**
+!scripts/
+!scripts/build_agent.py
+!scripts/native_agent_smoke.py
+!requirements.agent.txt
+!deploy/
+!deploy/Dockerfile.agent
+**/__pycache__

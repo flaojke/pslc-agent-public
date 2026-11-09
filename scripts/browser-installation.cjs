@@ -1,0 +1,44 @@
+const fs=require('node:fs');const path=require('node:path');const assert=require('node:assert/strict');
+const {chromium}=require(process.env.PSLC_PLAYWRIGHT_MODULE||'playwright');
+(async()=>{
+ const root=path.resolve(__dirname,'..');const live=JSON.parse(fs.readFileSync(path.join(root,'.local/settings.json'),'utf8'));
+ const fixture=JSON.parse(fs.readFileSync(path.join(root,'.local/installation-browser-qa.json'),'utf8'));
+ const out=path.join(root,'docs/qa/software-installation/screenshots');fs.mkdirSync(out,{recursive:true});
+ const browser=await chromium.launch({channel:'msedge',headless:true});const errors=[];
+ try{
+  const page=await browser.newPage({viewport:{width:1440,height:1000}});page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('http://127.0.0.1:8787');await page.locator('#token').fill(live.operator_token);await page.getByRole('button',{name:'Открыть рабочее место'}).click();
+  await page.getByRole('heading',{name:'Основной раздел',exact:true}).waitFor();
+  assert.equal(await page.locator('textarea').count(),1,'Main page must have exactly one prompt');
+  await page.screenshot({path:path.join(out,'00-main.png'),fullPage:true});
+  await page.locator('nav button').filter({hasText:'Устройства'}).click();await page.locator('tbody tr').first().waitFor();
+  await page.screenshot({path:path.join(out,'01-devices.png'),fullPage:true});
+  await page.locator('tbody tr').first().getByRole('button',{name:'Открыть'}).click();
+  await page.getByRole('button',{name:'Создать проверку состояния'}).click();
+  await page.locator('.plan .status').filter({hasText:'Проверка завершена'}).waitFor({timeout:15000});
+  await page.screenshot({path:path.join(out,'02-device-task.png'),fullPage:true});
+  await page.locator('nav button').filter({hasText:'События'}).click();await page.locator('.timeline .event').first().waitFor();
+  await page.screenshot({path:path.join(out,'03-events.png'),fullPage:true});
+  await page.locator('nav button').filter({hasText:'Знания'}).click();await page.getByRole('heading',{name:'Проверенные знания рядом с задачей'}).waitFor();
+  await page.screenshot({path:path.join(out,'04-knowledge.png'),fullPage:true});
+  await page.locator('nav button').filter({hasText:'Основной раздел'}).click();await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.locator('textarea').count(),1);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.screenshot({path:path.join(out,'05-mobile-main.png'),fullPage:true});
+  const qa=await browser.newPage({viewport:{width:1440,height:1000}});qa.on('pageerror',e=>errors.push(e.message));
+  await qa.goto(fixture.url);await qa.locator('#token').fill(fixture.token);await qa.getByRole('button',{name:'Открыть рабочее место'}).click();
+  await qa.locator('nav button').filter({hasText:'Устройства'}).click();await qa.locator('tbody tr').first().getByRole('button',{name:'Открыть'}).click();
+  await qa.getByRole('button',{name:'Установка ПО',exact:true}).click();await qa.getByLabel('Утверждённый пакет').selectOption('fixture-tool@1.2.3');
+  await qa.getByRole('button',{name:'Подготовить план'}).click();await qa.getByRole('heading',{name:'План установки ПО',exact:true}).waitFor();
+  await qa.locator('.package-review').getByText('Ожидаемый результат: 1.2.3').waitFor();
+  await qa.screenshot({path:path.join(out,'06-install-review-qa-fixture.png'),fullPage:true});
+  await qa.getByRole('button',{name:'Отклонить',exact:true}).click();await qa.locator('.plan .status').filter({hasText:'Отклонено'}).waitFor();
+  await qa.getByRole('button',{name:'Подготовить план'}).click();await qa.getByRole('button',{name:'Подтвердить выполнение'}).click();
+  await qa.locator('.plan .status').filter({hasText:'В очереди'}).waitFor();
+  const catalog=JSON.parse(fs.readFileSync(fixture.catalog,'utf8'));catalog.packages[0].sha256='0'.repeat(64);fs.writeFileSync(fixture.catalog,JSON.stringify(catalog));
+  await qa.locator('.plan .status').filter({hasText:'Запись каталога изменилась'}).waitFor({timeout:10000});
+  assert.deepEqual(errors,[]);
+  const report={mainSinglePrompt:true,defaultMainSection:true,realHealthTask:true,reviewedFixturePlan:true,rejection:true,approval:true,catalogInvalidation:true,realSoftwareInstalled:false,pageErrors:errors,screenshots:7,desktop:true,mobileHorizontalOverflow:false};
+  fs.writeFileSync(path.join(root,'docs/qa/software-installation/browser.json'),JSON.stringify(report,null,2));console.log('Browser QA passed: main single prompt, device install plan/reject/approve/invalidation, no real software installed');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e.message);process.exit(1)});

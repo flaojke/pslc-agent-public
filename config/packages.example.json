@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "packages": [
+    {
+      "id": "example-app",
+      "name": "EXAMPLE ONLY \u2014 replace with approved package",
+      "version": "1.2.3",
+      "os_family": "Windows",
+      "installer": "msi",
+      "source_url": "https://packages.internal.example/app-1.2.3.msi",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "max_bytes": 268435456,
+      "timeout_seconds": 600,
+      "silent_args": [],
+      "no_restart_args": [],
+      "verification_argv": [
+        "C:\\Program Files\\Example App\\app.exe",
+        "--version"
+      ],
+      "expected_output": "1.2.3",
+      "uninstall_instructions": "EXAMPLE ONLY: replace the zero GUID, family-absence probe, URL/hash/version and paths with a reviewed real package contract. Not a default approved package.",
+      "recovery": {
+        "uninstall_argv": [
+          "msiexec",
+          "/x",
+          "{00000000-0000-0000-0000-000000000000}",
+          "/qn",
+          "/norestart",
+          "REBOOT=ReallySuppress"
+        ],
+        "absence_argv": [
+          "powershell",
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          "if (Test-Path -LiteralPath 'C:\\Program Files\\Example App') { Write-Output 'PRESENT-OR-UNKNOWN'; exit 1 }; Write-Output 'ABSENT:example-app'"
+        ],
+        "absence_expected_output": "ABSENT:example-app",
+        "timeout_seconds": 600,
+        "verification_timeout_seconds": 15
+      }
+    }
+  ]
+}

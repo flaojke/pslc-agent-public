@@ -1,0 +1,14 @@
+# Confluence и RAG — 0.6.0
+
+Актуальный scope0.10: этот коннектор отложен. Локальные УЗ описаны в LOCAL_ACCOUNTS.md; Confluence/AD не требуются для текущей работы. Содержимое ниже — сохранённая техническая инструкция опционального режима, не факт текущего подключения.
+
+
+PSLC_CONFLUENCE_URL — HTTPS base с /wiki в Cloud или context DC; PSLC_CONFLUENCE_KIND=cloud|dc; PSLC_CONFLUENCE_SPACES — comma-separated allowlist. В OIDC PSLC_CONFLUENCE_BINDINGS указывает UTF-8 JSON {"opaque-principal-id":"upstream-account-id"}. Principal ID виден /api/me, mapping создаёт администратор. Cloud OAuth bearer проверяется через accountId, DC PAT через userKey. Персональный token вводится только в password-форме «Знания», проверяется live, хранится RAM≤15min и удаляется logout/disconnect/restart. Общий PAT доступен только единственному local owner. Нет автоматической OAuth provisioning/refresh без tenant-конфигурации.
+
+Основной промпт: «Найди инструкцию ошибка сервиса». Confluence FTS возвращает≤5 актуальных страниц в пересечении прав; получаем≤20K символов. При настроенной модели строгий JSON answer/citations, затем повторная ACL/version проверка. Ответ явно неподтверждённый; специалист проверяет применимость. Без модели — sources_only, без выдуманного LLM-ответа. Нет исполнения из текста страниц. Query, body, excerpts, generated answer RAM≤120s; UI повторно проверяет источники каждые5s и скрывает при отказе. No stale fallback.
+
+Review хранит только source ID/version/space, OS/service/version applicability, owner/reviewer, optional verified taskID, state/revision/timestamps. Страница/решение пишется человеком в Confluence; коннектор только GET. draft→in_review автором, published независимым reviewer (local dev допускает одного владельца), затем deprecated→archived reviewer. Publication фиксирует ручную проверку применимости ссылки, не уверенность модели. Произвольный ответ расследования не публикуется. Изменённая версия требует нового draft. Известный version mismatch не допускает действия: знания вообще не конвертируются автоматически в исполняемые планы.
+
+ADR-002: исходный FTS+pgvector — целевая рекомендация v0.2. Для первого MVP используется native Confluence FTS с live read-through без durable page/vector index. Это упрощает ACL/revocation и исключает копирование встроенных raw logs в индекс. Semantic index — явная отложенная возможность, не заявляется готовой.
+
+Официальные API: [Cloud search](https://developer.atlassian.com/cloud/confluence/rest/v1/api-group-search/), [Cloud pages v2](https://developer.atlassian.com/cloud/confluence/rest/v2/api-group-page/), [Current user](https://developer.atlassian.com/cloud/confluence/rest/v1/api-group-users/), [DC REST examples](https://developer.atlassian.com/server/confluence/confluence-rest-api-examples/). Проверены08.11.2026. Cloud OAuth scopes/tenant routing проверяются с реальным сайтом отдельно. Fixtures не удостоверяют корпоративное подключение.

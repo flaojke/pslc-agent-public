@@ -1,0 +1,46 @@
+{
+  "A01": [
+    "tests/test_control_plane.py::test_enrollment_replay_expiry_and_hashes",
+    "tests/test_control_plane.py::test_duplicate_names_revocation_and_freshness",
+    "tests/test_accounts_nodes.py",
+    "tests/test_demo_device.py"
+  ],
+  "A02": [
+    "tests/test_incident_investigation.py::test_model_hypotheses_refs_and_duplicate_does_not_repeat",
+    "tests/test_incident_investigation.py::test_windows_incomplete_is_partial",
+    "tests/test_incident_investigation.py::test_journal_fixed_argv_and_opaque_cursor"
+  ],
+  "A03": [
+    "tests/test_knowledge_retrieval.py",
+    "tests/test_openwebui_connection.py",
+    "tests/test_model_settings.py"
+  ],
+  "A04": [
+    "tests/test_software_installation.py::test_confirmation_install_verify_end_to_end_and_retention",
+    "tests/test_software_installation.py::test_false_success_and_timeout",
+    "tests/test_software_installation.py::test_already_installed_skips_download"
+  ],
+  "A05": [
+    "tests/test_executor_integrations.py::test_safe_runtime",
+    "tests/test_executor_integrations.py::test_missing_runtime_and_invalid_input",
+    "tests/test_executor_integrations.py::test_bounded_output_and_timeout"
+  ],
+  "A06": [
+    "tests/test_control_plane.py::test_session_five",
+    "tests/test_control_plane.py::test_atomic_fleet_twenty",
+    "tests/test_operations_recovery.py::test_postgres_concurrent_20_and_5_across_connections",
+    "tests/test_operations_recovery.py::test_postgres_500_registry_cap_is_synthetic"
+  ],
+  "A07": [
+    "tests/test_control_plane.py::test_restart_unknown_and_lost_plan",
+    "tests/test_control_plane.py::test_expired_lease_no_repeat_and_manual_reconcile",
+    "tests/test_operator_identity.py::test_confirmed_owner_permission_loss_and_session_limit_is_per_owner",
+    "tests/test_pilot_readiness.py",
+    "tests/test_pilot_transport.py"
+  ],
+  "A08": [
+    "tests/test_operations_recovery.py::test_sqlite_snapshot_recovery_marker_history_and_conservative_states",
+    "tests/test_operations_recovery.py::test_postgres_v4_migration_backup_restore_and_restart",
+    "tests/test_incident_investigation.py::test_backup_restore_has_metadata_without_raw_log_or_hypothesis"
+  ]
+}
