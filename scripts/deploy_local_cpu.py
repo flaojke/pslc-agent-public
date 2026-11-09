@@ -28,12 +28,12 @@ def facts():
   p=ROOT/name
   if p.is_file():out['protected'][name]=hashlib.sha256(p.read_bytes()).hexdigest()
  return out
-checkpoint=ROOT/'.local/deploy-018.json'
+checkpoint=ROOT/'.local/deploy-0181.json'
 mode=sys.argv[1]
 if mode=='preflight':
  value=facts()
  if value['active_tasks'] or value['active_turns'] or value['active_analysis']:raise SystemExit('Active work; maintenance deferred')
- base=ROOT/'.local/backups'/('pre-018-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S'));SecretStore(base/'metadata.json')._directory()
+ base=ROOT/'.local/backups'/('pre-0181-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S'));SecretStore(base/'metadata.json')._directory()
  value['directory']=str(base);checkpoint.write_text(json.dumps(value),encoding='utf-8')
  print(json.dumps({'idle':True,'backup_directory':str(base)}))
 elif mode=='backup':

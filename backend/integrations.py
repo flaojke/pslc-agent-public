@@ -81,8 +81,12 @@ class Integrations:
                     kwargs['json']=body
                 return self.client.stream(method,url,**kwargs)
         with self.model_connection.local.generation(s.model_id):
-            with httpx.Client(transport=self.transport,timeout=httpx.Timeout(120,connect=5),follow_redirects=False,trust_env=False) as client:
-                yield BoundedLocalClient(client)
+            try:
+                with httpx.Client(transport=self.transport,timeout=httpx.Timeout(120,connect=5),follow_redirects=False,trust_env=False) as client:
+                    yield BoundedLocalClient(client)
+            except (IntegrationError,httpx.HTTPError):
+                self.model_connection.local._stop()
+                raise
 
     def ask_messages(self,messages,context):
         s=self.s

@@ -59,17 +59,20 @@ def main():
   git('push','-u','origin','main')
   exists=git('rev-parse','--verify','refs/tags/'+tag,check=False)
   if exists.returncode:git('tag','-a',tag,'-m','PSLC Agent '+version+' verified local MVP')
-  else:assert git('rev-list','-n','1',tag).stdout.strip()==sha,'Existing tag points elsewhere'
+  else:
+   assert not git('diff','--name-only',tag,'HEAD','--','backend','agent','frontend/src','config','package.json','pyproject.toml').stdout.strip(),'Existing tag application differs'
+   sha=git('rev-list','-n','1',tag).stdout.strip()
   git('push','origin',tag)
   print(json.dumps({'phase':'source_pushed','commit':sha,'tag':tag,'files':len(allowed)}),flush=True)
-  notes=(ROOT/'docs/RELEASE_NOTES_0.18.0.md').read_text(encoding='utf-8')
+  notes=(ROOT/('docs/RELEASE_NOTES_'+version+'.md')).read_text(encoding='utf-8')
   for name in ('VERIFICATION_LOCAL_CPU.md','INSTALL_RELEASE.md','DISTRIBUTION_CONTENTS.md'):
    notes=notes.replace(']('+name+')','](https://github.com/'+REPO+'/blob/'+tag+'/docs/'+name+')')
   notes+='\n\n## Скачать\n\nLite: ZIP + .sha256. Full: обе Full.zip.partNN, Full.parts.json и assemble_full.py в одну папку; python assemble_full.py PSLC-Agent-'+version+'-Full.parts.json. Затем распакуйте ZIP, откройте START_HERE.md. Доступ к этим загрузкам требует входа в приватный репозиторий.\n\n## SHA256 поставок\n\n'
   for row in manifest['packages']:notes+='- '+row['variant']+': '+str(row['bytes'])+' bytes; \x60'+row['sha256']+'\x60\n'
-  r=c.get('https://api.github.com/repos/'+REPO+'/releases/tags/'+tag)
-  if r.status_code==404:release=api('POST','/repos/'+REPO+'/releases',json={'tag_name':tag,'target_commitish':sha,'name':'PSLC Agent '+version+' · Full / Lite','body':notes,'draft':True,'prerelease':True})
-  else:r.raise_for_status();release=r.json()
+  matches=[x for x in api('GET','/repos/'+REPO+'/releases?per_page=100') if x['tag_name']==tag]
+  assert len(matches)<=1,'Duplicate release drafts'
+  if matches:release=matches[0]
+  else:release=api('POST','/repos/'+REPO+'/releases',json={'tag_name':tag,'target_commitish':sha,'name':'PSLC Agent '+version+' · Full / Lite','body':notes,'draft':True,'prerelease':True})
   assert release['tag_name']==tag
   upload=release['upload_url'].split('{')[0]
   assert upload=='https://uploads.github.com/repos/'+REPO+'/releases/'+str(release['id'])+'/assets'
@@ -90,11 +93,18 @@ def main():
     time.sleep(1);asset=api('GET','/repos/'+REPO+'/releases/assets/'+str(asset['id']))
    assert asset['state']=='uploaded' and asset['size']==row['bytes']
    assert asset.get('digest')=='sha256:'+row['sha256'],'GitHub asset digest mismatch'
-   assert asset['browser_download_url'].startswith('https://github.com/'+REPO+'/releases/download/'+tag+'/')
+   assert asset['browser_download_url'].startswith('https://github.com/'+REPO+'/releases/download/')
    verified.append({'name':name,'bytes':row['bytes'],'sha256':row['sha256'],'github_digest_verified':True,'url':asset['browser_download_url']})
    print(json.dumps({'phase':'asset_verified','name':name,'bytes':row['bytes']}),flush=True)
   release=api('PATCH','/repos/'+REPO+'/releases/'+str(release['id']),json={'draft':False,'prerelease':True,'body':notes})
   final_repo=api('GET','/repos/'+REPO);assert final_repo['private'] and not release['draft']
+  for _ in range(30):
+   final_assets={a['name']:a for a in api('GET','/repos/'+REPO+'/releases/'+str(release['id'])+'/assets?per_page=100')}
+   if all(final_assets[row['name']]['browser_download_url'].startswith('https://github.com/'+REPO+'/releases/download/'+tag+'/') for row in verified):break
+   time.sleep(1)
+  for row in verified:
+   a=final_assets[row['name']];assert a['browser_download_url'].startswith('https://github.com/'+REPO+'/releases/download/'+tag+'/')
+   assert a.get('digest')=='sha256:'+row['sha256'];row['url']=a['browser_download_url']
   report={'version':version,'repository':repo['html_url'],'private':True,'release':release['html_url'],'tag':tag,'source_commit':sha,'source_files':len(allowed),'weights_in_git':False,'assets':verified,'production_admitted':False}
   dest=ROOT/'docs/qa/local-model/github-release.json';dest.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
   print(json.dumps({'phase':'published','repository':repo['html_url'],'release':release['html_url'],'private':True,'assets':len(verified)}),flush=True)
