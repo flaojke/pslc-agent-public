@@ -57,3 +57,15 @@ API key SHALL сохраняться только в защищённом server
 #### Scenario: Disable
 - **WHEN** admin отключил подключение
 - **THEN** новые обращения не вызывают прежнюю модель и не возвращаются к env fallback
+
+### Requirement: MC-007 Selectable model profiles
+Admin SHALL переключать активную модель между проверяемыми local catalog моделями и сохранёнными OpenWebUI profiles. Переключение SHALL сохранять остальные profiles/ключи и применять целостный snapshot для новых запросов. UI MUST показывать текущий provider/model и отсутствие готовности без скрытой подмены.
+#### Scenario: Switch back to local
+- **WHEN** выбран local после OpenWebUI
+- **THEN** ключ OpenWebUI сохранён, новые запросы используют выбранную local модель после проверки файлов
+
+### Requirement: MC-008 Compatible provider migration
+Новая установка SHALL выбирать local Qwen4B. Upgrade SHALL сохранять прежнюю явно настроенную OpenWebUI модель либо disabled состояние. Невалидная encrypted конфигурация MUST не вызывать автоматический fallback. Существующие metadata schema/УЗ/узловые identities SHALL сохраняться; M6 не понижает текущую schema9.
+#### Scenario: Legacy external configuration
+- **WHEN** обновлена установка0.11 с сохранённым ключом
+- **THEN** прежний выбор и credential сохранены; local становится доступной опцией
