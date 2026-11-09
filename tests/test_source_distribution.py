@@ -12,7 +12,7 @@ def test_source_has_frontend_and_docker_build_context_without_private_state(publ
  assert not any(n.startswith(('.local/','models/','runtime/','artifacts/')) for n in public_files)
  assert 'docs/qa/settings-guides/screenshots/07-live-about.png' not in public_files
 
-@pytest.mark.parametrize('missing',['frontend/index.html','deploy/Dockerfile.agent','deploy/Dockerfile.cpu-qa'])
+@pytest.mark.parametrize('missing',['frontend/index.html','deploy/Dockerfile.agent','deploy/Dockerfile.cpu-qa','scripts/install_bootstrap.py','backend/runtime_host.py','backend/runtime_process.py'])
 def test_missing_build_inputs_fail_closed(public_files,missing):
  files={k:v for k,v in public_files.items() if k!=missing}
  with pytest.raises(ValueError,match='missing_build_input'):validate_source_inputs(files)

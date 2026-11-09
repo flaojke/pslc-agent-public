@@ -37,3 +37,21 @@ Global admin SHALL запускать/отменять/повторять заг
 #### Scenario: Actual health plan
 - **WHEN** реальная локальная модель предложила допустимую health-задачу
 - **THEN** исполнение проходит обычные scope/confirmation/postcondition, отчёт содержит реально измеренную длительность без raw output
+
+### Requirement: LI-006 Noninteractive Windows authorization failure
+Windows runtime version/start checks SHALL suppress inherited loader error dialogs in an isolated owned process. Recognized policy/signature blocks SHALL return local_runtime_policy_blocked without fallback or security changes. Known blocks SHALL appear in model status/UI without changing provider/model identity or misreporting missing weights. Existing ownership, timeouts and RAM-only output SHALL remain enforced.
+#### Scenario: Recognized Windows block
+- **WHEN** child creation raises WinError4551/577, or the native child exits with NTSTATUS0xC0E90002/0xC0000428 in signed or unsigned32 form
+- **THEN** the bounded check fails with local_runtime_policy_blocked (existing HTTP502); no loader modal acknowledgement, security change or external fallback is required
+#### Scenario: Unknown failure
+- **WHEN** the native child returns another code, including77, or a different launch error occurs
+- **THEN** the existing generic dependency/start failure remains; it is not falsely classified as a policy block
+#### Scenario: Worker cancellation and owner death
+- **WHEN** probe deadline, API close or owning process death occurs
+- **THEN** only the owned worker/runtime tree stops; unrelated processes continue and no raw output/keys are saved
+#### Scenario: Known block visible to operator
+- **WHEN** local runtime has a known local_runtime_policy_blocked error and an authorized operator reads active model metadata
+- **THEN** model status carries that fixed code while provider/model IDs remain unchanged; admin keys, OS messages and policy internals are absent
+#### Scenario: Truthful interface after model choice
+- **WHEN** administrator selects a local model or a recognized block is returned
+- **THEN** UI does not promise working inference before probe success; ModelHub and main section identify Windows authorization block instead of asking to download intact weights

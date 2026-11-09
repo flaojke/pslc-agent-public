@@ -50,8 +50,11 @@ class Integrations:
 
     def status(self):
         s=self.s
+        local_blocked=False
+        if s.model_backend=="local" and self.model_connection is not None:
+            with self.model_connection.local.lock:local_blocked=self.model_connection.local.runtime_error=="local_runtime_policy_blocked"
         local_missing=s.model_backend=="local" and self.model_connection is not None and not self.model_connection.local.verified_model(s.model_id)
-        return {"model":"local_unavailable" if local_missing else "configured_unverified" if s.model_url and s.model_id else "not_configured",
+        return {"model":"local_runtime_policy_blocked" if local_blocked else "local_unavailable" if local_missing else "configured_unverified" if s.model_url and s.model_id else "not_configured",
             "confluence":"deferred" if not self.s.knowledge_enabled else "configured_unverified" if self.s.confluence_url and self.s.confluence_token and self.s.confluence_spaces else "not_configured"}
 
     def client(self):

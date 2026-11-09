@@ -8,6 +8,7 @@ import {PlanStep,states,errors,type Flow} from './AgentWorkspace';
 import {InvestigationResult} from './InvestigationResult';
 
 type Api=<T>(path:string,method?:string,body?:unknown)=>Promise<T>;
+type ActiveModel={id:string;provider:string;status:string};
 type Device={id:string;name:string;os_family:string;device_kind?:string;online:boolean;revoked:boolean;virtual?:boolean};
 type Scope={kind:string;ids:string[]};
 type Temp={question:string;answer:string|null;expires:number};
@@ -21,24 +22,30 @@ const busyStates=['queued','generating'];
 const terminalSuccess=['verified','already_installed','restored'];
 const phases=[['clarify','Уточнение'],['facts','Факты'],['plan','План'],['check','Проверка']] as const;
 
-export function CaseWorkspace({api,devices,modelStatus,onMutate,operatorId,canOperate=false,selectedId,onSelect}:{api:Api;devices:Device[];modelStatus?:string;onMutate:()=>Promise<void>;operatorId?:string;canOperate?:boolean;selectedId:string;onSelect:(id:string)=>void}){
+export function CaseWorkspace({api,devices,onMutate,operatorId,canOperate=false,selectedId,onSelect}:{api:Api;devices:Device[];modelStatus?:string;onMutate:()=>Promise<void>;operatorId?:string;canOperate?:boolean;selectedId:string;onSelect:(id:string)=>void}){
  const client=useRef(api);client.current=api;
  const [chats,setChats]=useState<Conversation[]>([]),[active,setActive]=useState<Conversation|null>(null);
  const [host,setHost]=useState<HTMLElement|null>(null),[question,setQuestion]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
- const [rename,setRename]=useState(false),[name,setName]=useState(''),[clock,setClock]=useState(Date.now()),[model,setModel]=useState({id:'',provider:''});
+ const [rename,setRename]=useState(false),[name,setName]=useState(''),[clock,setClock]=useState(Date.now()),[model,setModel]=useState<ActiveModel|null>(null);
  const [targetOpen,setTargetOpen]=useState(false),[filter,setFilter]=useState(''),[page,setPage]=useState<Record<string,number>>({});
  const [phaseOpen,setPhaseOpen]=useState<Record<string,boolean>>({clarify:true,facts:false,plan:false,check:false});
  const selected=useRef(selectedId);selected.current=selectedId;
  const mounted=useRef(true),editor=useRef<HTMLTextAreaElement|null>(null);
- useEffect(()=>{mounted.current=true;setHost(document.getElementById('conversation-navigation'));return()=>{mounted.current=false;};},[]);
+ const actor=useRef(operatorId),actorEpoch=useRef(0);
+ if(actor.current!==operatorId){actor.current=operatorId;actorEpoch.current++;}
+ const currentActor=(epoch:number)=>mounted.current&&actorEpoch.current===epoch;
+ const caseUnavailable=active?active.id!==selectedId:!!selectedId;
+ const modelEpoch=useRef(0),modelFlight=useRef<{promise:Promise<void>;timeout:ReturnType<typeof setTimeout>}|null>(null);
+ useEffect(()=>{mounted.current=true;setHost(document.getElementById('conversation-navigation'));return()=>{mounted.current=false;actorEpoch.current++;};},[]);
  async function refresh(){
+  const epoch=actorEpoch.current;
   const list=await client.current<Conversation[]>('/conversations');
-  if(!mounted.current)return;
+  if(!currentActor(epoch))return;
   setChats(list);const id=list.some(c=>c.id===selected.current)?selected.current:list[0]?.id;
   if(!id){setActive(null);return;}
   if(id!==selected.current)onSelect(id);
   const value=await client.current<Conversation>('/conversations/'+id);
-  if(mounted.current&&(selected.current===id||!selected.current))setActive(value);
+  if(currentActor(epoch)&&(selected.current===id||!selected.current))setActive(value);
  }
  useEffect(()=>{
   let loading=false;
@@ -46,8 +53,29 @@ export function CaseWorkspace({api,devices,modelStatus,onMutate,operatorId,canOp
   void load();const poll=setInterval(()=>void load(),2000);const tick=setInterval(()=>setClock(Date.now()),1000);
   return()=>{clearInterval(poll);clearInterval(tick);};
  },[]);
- useEffect(()=>{if(selectedId){void client.current<Conversation>('/conversations/'+selectedId).then(value=>{if(mounted.current&&selected.current===selectedId)setActive(value);}).catch(e=>setError(caseErrors[(e as Error).message]??'Беседа недоступна.'));}setQuestion('');setRename(false);setPage({});},[selectedId]);
- useEffect(()=>{void client.current<{id:string;provider:string}>('/model/active').then(setModel).catch(()=>{});},[]);
+ useEffect(()=>{const epoch=actorEpoch.current;if(selectedId){void client.current<Conversation>('/conversations/'+selectedId).then(value=>{if(currentActor(epoch)&&selected.current===selectedId)setActive(value);}).catch(e=>{if(currentActor(epoch)&&selected.current===selectedId)setError(caseErrors[(e as Error).message]??'Беседа недоступна.');});}setQuestion('');setRename(false);setPage({});},[selectedId,operatorId]);
+ function refreshModel():Promise<void>{
+  if(modelFlight.current)return modelFlight.current.promise;
+  const epoch=++modelEpoch.current;
+  const current=()=>mounted.current&&modelEpoch.current===epoch;
+  let operation:Promise<ActiveModel>;
+  try{operation=client.current<ActiveModel>('/model/active');}catch(e){operation=Promise.reject(e);}
+  let expired=false;
+  const timeout=setTimeout(()=>{expired=true;if(current())setModel(null);},5000);
+  const promise=operation.then(value=>{
+   if(!value||typeof value.id!=='string'||!['local','external'].includes(value.provider)||typeof value.status!=='string')throw new Error('invalid_active_model');
+   if(current()&&!expired)setModel({id:value.id,provider:value.provider,status:value.status});
+  }).catch(()=>{if(current())setModel(null);}).finally(()=>{clearTimeout(timeout);if(modelEpoch.current===epoch)modelFlight.current=null;});
+  modelFlight.current={promise,timeout};return promise;
+ }
+ useEffect(()=>{
+  setModel(null);void refreshModel();
+  const poll=setInterval(()=>void refreshModel(),2000);
+  const focused=()=>void refreshModel();
+  const visible=()=>{if(document.visibilityState==='visible')void refreshModel();};
+  window.addEventListener('focus',focused);document.addEventListener('visibilitychange',visible);
+  return()=>{clearInterval(poll);window.removeEventListener('focus',focused);document.removeEventListener('visibilitychange',visible);modelEpoch.current++;if(modelFlight.current)clearTimeout(modelFlight.current.timeout);modelFlight.current=null;};
+ },[operatorId]);
  const turns=active?.turns??[],pending=turns.find(t=>busyStates.includes(t.state));
  const dialogueTurns=turns.filter(t=>!t.workflow),lastTextTurn=dialogueTurns.at(-1);
  const flows=turns.filter(t=>t.workflow).map(t=>t.workflow!);
@@ -63,23 +91,28 @@ export function CaseWorkspace({api,devices,modelStatus,onMutate,operatorId,canOp
  const scope=active?.target_scope??{kind:'none',ids:[]};
  const targets=devices.filter(d=>!d.revoked&&(scope.kind==='all'||scope.kind==='demo'&&d.virtual||scope.kind==='workstations'&&!d.virtual&&d.device_kind==='workstation'||scope.kind==='servers'&&!d.virtual&&d.device_kind==='server'||scope.kind==='manual'&&scope.ids.includes(d.id)));
  const readyFacts=flows.flatMap(f=>f.steps.filter(s=>terminalSuccess.includes(s.state)&&!s.recovery?.historical).map(s=>({...s,flow:f.id})));
- async function act(fn:()=>Promise<unknown>){setBusy(true);setError('');try{await fn();await refresh();await onMutate();}catch(e){if(mounted.current)setError(caseErrors[(e as Error).message]??'Запрос не выполнен. Проверьте состояние и повторите.');}finally{if(mounted.current)setBusy(false);}}
+ async function act(fn:()=>Promise<unknown>){const epoch=actorEpoch.current;setBusy(true);setError('');try{await fn();if(currentActor(epoch))await refresh();if(currentActor(epoch))await onMutate();}catch(e){if(currentActor(epoch))setError(caseErrors[(e as Error).message]??'Запрос не выполнен. Проверьте состояние и повторите.');}finally{if(currentActor(epoch))setBusy(false);}}
  async function create(){
-  await act(async()=>{const c=await client.current<Conversation>('/conversations','POST',{title:'Беседа · '+new Date().toLocaleTimeString('ru-RU',systemDateOptions())});onSelect(c.id);selected.current=c.id;setActive(c);setQuestion('');});
+  const epoch=actorEpoch.current,selection=selected.current;
+  await act(async()=>{const c=await client.current<Conversation>('/conversations','POST',{title:'Беседа · '+new Date().toLocaleTimeString('ru-RU',systemDateOptions())});if(!currentActor(epoch)||selected.current!==selection)return;onSelect(c.id);selected.current=c.id;setActive(c);setQuestion('');});
  }
  async function chooseScope(kind:string,ids:string[]=[],id=active?.id){
   if(!id||!active)return;
   await act(async()=>{const value=await client.current<Conversation>('/conversations/'+id,'PUT',{title:active.title,scope:{kind,ids}});setActive(value);setPage({});});
  }
  async function send(){
-  if(!question.trim()||busy||pending||!canOperate)return;
-  let cid=active?.id;const q=question;
-  await act(async()=>{if(!cid){const c=await client.current<Conversation>('/conversations','POST',{});cid=c.id;onSelect(cid);selected.current=cid;setActive(c);}
-   await client.current('/conversations/'+cid+'/messages','POST',{request_id:crypto.randomUUID(),question:q});setQuestion('');});
+  if(!question.trim()||busy||pending||!canOperate||(active?active.id!==selected.current:!!selected.current))return;
+  void refreshModel();
+  let cid=active?.id;const q=question,selection=selected.current,epoch=actorEpoch.current;
+  await act(async()=>{if(!cid){const c=await client.current<Conversation>('/conversations','POST',{});if(!currentActor(epoch)||selected.current!==selection)return;cid=c.id;onSelect(cid);selected.current=cid;setActive(c);}
+   if(!currentActor(epoch)||selected.current!==cid)return;
+   await client.current('/conversations/'+cid+'/messages','POST',{request_id:crypto.randomUUID(),question:q});if(currentActor(epoch)&&selected.current===cid)setQuestion('');});
  }
  async function plan(){
-  if(!active||busy||pending)return;
-  await act(async()=>{await client.current('/conversations/'+active.id+'/plans','POST',{request_id:crypto.randomUUID(),question:question.trim()});setQuestion('');setPhaseOpen(p=>({...p,plan:true}));});
+  if(!active||active.id!==selected.current||busy||pending||!canOperate)return;
+  void refreshModel();
+  const cid=active.id,q=question.trim(),epoch=actorEpoch.current;
+  await act(async()=>{await client.current('/conversations/'+cid+'/plans','POST',{request_id:crypto.randomUUID(),question:q});if(currentActor(epoch)&&selected.current===cid){setQuestion('');setPhaseOpen(p=>({...p,plan:true}));}});
  }
  async function remove(c:Conversation){
   if(!window.confirm('Удалить беседу «'+c.title+'»? Её полный временный контекст будет удалён. Активным заданиям будет запрошена отмена; это не откат. Метаданные аудита сохранятся.'))return;
@@ -89,17 +122,18 @@ export function CaseWorkspace({api,devices,modelStatus,onMutate,operatorId,canOp
   await act(async()=>{const v=await client.current<{filename:string;markdown:string}>('/tasks/'+tid+'/improvement');const url=URL.createObjectURL(new Blob([v.markdown],{type:'text/markdown;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=v.filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
  }
  const navigation=<section className="conversation-nav" aria-label="Беседы"><div className="conversation-nav-title"><h2>Беседы</h2><button type="button" className="ghost" disabled={busy||!canOperate} onClick={()=>void create()} aria-label="Создать новую беседу">＋</button></div>
- <div className="conversation-list">{!chats.length&&<p className="muted">Создайте беседу для отдельной проблемы.</p>}{chats.map(c=><div key={c.id} className={'conversation-row '+(c.id===selectedId?'chosen':'')}><button className="conversation-name" onClick={()=>{onSelect(c.id);setQuestion('');}}><span>{c.title}</span><small>{date(c.updated)}</small></button><button className="conversation-delete" aria-label={'Удалить беседу '+c.title} disabled={busy||!canOperate} onClick={()=>void remove(c)}>×</button></div>)}</div>
+ <div className="conversation-list">{!chats.length&&<p className="muted">Создайте беседу для отдельной проблемы.</p>}{chats.map(c=><div key={c.id} className={'conversation-row '+(c.id===selectedId?'chosen':'')}><button className="conversation-name" onClick={()=>{selected.current=c.id;onSelect(c.id);setQuestion('');}}><span>{c.title}</span><small>{date(c.updated)}</small></button><button className="conversation-delete" aria-label={'Удалить беседу '+c.title} disabled={busy||!canOperate} onClick={()=>void remove(c)}>×</button></div>)}</div>
  <button className="primary new-conversation" disabled={busy||!canOperate} onClick={()=>void create()}>＋ Новая беседа</button></section>;
  return <section className="case-workspace">
  {host&&createPortal(navigation,host)}
  <div className="case-heading"><div><span className="eyebrow">ДИАЛОГ · ХОД РАЗБОРА</span><h2>{active?.title??'Новая проблема — новая беседа'}</h2></div>{active&&<button className="ghost" disabled={busy||!canOperate} onClick={()=>{setName(active.title);setRename(!rename);}}>Переименовать</button>}</div>
  {rename&&active&&<form className="rename-conversation" onSubmit={e=>{e.preventDefault();void act(async()=>{setActive(await client.current<Conversation>('/conversations/'+active.id,'PUT',{title:name}));setRename(false);});}}><label htmlFor="conversation-title">Короткое имя беседы <small>Сохраняется в истории. Не вставляйте журналы или секреты.</small></label><input id="conversation-title" value={name} onChange={e=>setName(e.target.value)} maxLength={80} required/><button className="primary" disabled={busy}>Сохранить имя</button></form>}
  <form className="case-composer" onSubmit={e=>{e.preventDefault();void send();}}>
- <div className="case-context"><label htmlFor="target-scope">Целевые машины<select id="target-scope" aria-label="Целевые машины" value={scope.kind} disabled={!active||busy||!!pending||!canOperate} onChange={e=>void chooseScope(e.target.value)}>{Object.entries(scopeLabels).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label><button type="button" className="ghost target-count" disabled={!active} onClick={()=>setTargetOpen(!targetOpen)}>Цели: {targets.length} · показать список</button><span className="model-label">Модель: {model.id||'не подключена'}{model.provider==='local'?' · CPU':''}{modelStatus==='local_unavailable'?' · требуется загрузка в «Настройки → Модели»':''}</span></div>
+ <div className="case-context"><label htmlFor="target-scope">Целевые машины<select id="target-scope" aria-label="Целевые машины" value={scope.kind} disabled={!active||busy||!!pending||!canOperate} onChange={e=>void chooseScope(e.target.value)}>{Object.entries(scopeLabels).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label><button type="button" className="ghost target-count" disabled={!active} onClick={()=>setTargetOpen(!targetOpen)}>Цели: {targets.length} · показать список</button><span className="model-label" aria-live="polite">Активная модель: {model?model.id||'не подключена':'статус недоступен'}{model?.provider==='local'?' · CPU':''}{model?.status==='local_runtime_policy_blocked'?' · Windows блокирует запуск — Настройки → Модели':''}{model?.status==='local_unavailable'?' · требуется загрузка в «Настройки → Модели»':''}</span></div>
  {targetOpen&&<div className="target-picker"><label htmlFor="target-filter">Найти устройство<input id="target-filter" value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Имя или ID"/></label><p className="muted">Тип ПК/сервер назначается в «Устройствах». Неизвестный тип не входит в эти группы.</p><ul>{devices.filter(d=>!d.revoked&&(d.name+' '+d.id).toLowerCase().includes(filter.toLowerCase())).map(d=><li key={d.id}><label><input type="checkbox" checked={targets.some(x=>x.id===d.id)} disabled={busy||!!pending||!canOperate} onChange={e=>{const ids=targets.map(x=>x.id).filter(id=>id!==d.id);if(e.target.checked)ids.push(d.id);void chooseScope('manual',ids);}}/><span>{d.name}<small>{d.virtual?'Демо · только состояние':(d.device_kind==='server'?'Сервер':d.device_kind==='workstation'?'Пользовательский ПК':'Тип не указан')+' · '+d.os_family} · {d.online?'На связи':'Нет свежих данных'}</small></span></label></li>)}</ul></div>}
  <label htmlFor="case-message">Сообщение агенту<textarea id="case-message" aria-label="Сообщение агенту" ref={editor} value={question} onChange={e=>setQuestion(e.target.value)} disabled={!canOperate} maxLength={8000} rows={3} placeholder="Опишите проблему. Уточнения продолжат текущую беседу." onKeyDown={e=>{if(e.key==='Enter'&&e.ctrlKey&&!e.nativeEvent.isComposing){e.preventDefault();void send();}}}/></label>
- <div className="case-composer-actions"><small>Ctrl+Enter — отправить · Enter — новая строка</small><div><button type="button" className="ghost" disabled={!active||busy||!!pending||!targets.length||!canOperate} onClick={()=>void plan()}>Подготовить план</button><button type="submit" className="primary" disabled={busy||!!pending||!question.trim()||!canOperate}>{busy?'Обработка…':'Отправить →'}</button></div></div>
+ <div className="case-composer-actions"><small>Ctrl+Enter — отправить · Enter — новая строка</small><div><button type="button" className="ghost" disabled={!active||caseUnavailable||busy||!!pending||!targets.length||!canOperate} onClick={()=>void plan()}>Подготовить план</button><button type="submit" className="primary" disabled={caseUnavailable||busy||!!pending||!question.trim()||!canOperate}>{busy?'Обработка…':'Отправить →'}</button></div></div>
+ {caseUnavailable&&<p role="status">Выбранная беседа загружается… Отправка и план будут доступны после загрузки.</p>}
  <p className="case-retention">Полный контекст временный, до30минут. В истории — краткое имя, метаданные и проверенные итоги. Сообщение не запускает команду.</p>
  </form>
  {error&&<div role="alert" className="error">{error}</div>}

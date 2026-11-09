@@ -15,6 +15,11 @@ build/
 /models/
 /runtime/
 
+# Installer-owned first-install recovery metadata
+/.pslc-install.json
+/.pslc-install.lock
+/.pslc-install.pending-*.json
+
 # Local verification artifacts are not public source.
 docs/qa/
 docs/roadmap/

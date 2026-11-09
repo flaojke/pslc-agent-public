@@ -7,7 +7,7 @@ REQUIRED_BUILD_INPUTS=(
  'frontend/index.html','vite.config.ts','tsconfig.json','package.json','pnpm-lock.yaml',
  'pyproject.toml','requirements.lock.txt','requirements.agent.txt','requirements.build-windows.lock.txt',
  'deploy/Dockerfile.agent','deploy/Dockerfile.cpu-qa','.dockerignore',
- 'agent/entrypoint.py','agent/__init__.py','scripts/build_agent.py','scripts/native_agent_smoke.py')
+ 'agent/entrypoint.py','agent/__init__.py','scripts/build_agent.py','scripts/native_agent_smoke.py','scripts/install_bootstrap.py','backend/runtime_host.py','backend/runtime_process.py')
 EXPLICIT_INPUTS=(*REQUIRED_BUILD_INPUTS,'.agents/skills/.openspec-target')
 
 def explicit_inputs(root):
@@ -45,7 +45,7 @@ def collect():
  version=json.loads((ROOT/'package.json').read_text(encoding='utf-8'))['version']
  galleries=sorted(p.name for p in (ROOT/'release-dashboards').glob('*_MSK_v'+version) if p.is_dir())
  current_gallery=galleries[-1] if galleries else None
- safe_qa={'settings-guides','reversible-task-plans','scheduled-agent-work','local-model','compact-historical-messages'}
+ safe_qa={'settings-guides','reversible-task-plans','scheduled-agent-work','local-model','compact-historical-messages','model-label-refresh','runtime-policy'}
  directories=('backend','agent','frontend/src','frontend/dist','tests','scripts','openspec','qa','docs','deploy','config','licenses','.agents/skills','release-dashboards')
  allowed={'.py','.ps1','.cjs','.js','.md','.json','.yaml','.yml','.ts','.tsx','.css','.html','.png','.svg','.txt','.service','.pem','.sh'}
  for folder in directories:

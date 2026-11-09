@@ -1,19 +1,15 @@
-param([string]$PythonExecutable="py")
+param([string]$PythonExecutable="py",[switch]$Resume,[string]$Wheelhouse="")
 $ErrorActionPreference='Stop'
 $pslcReleaseRoot=Split-Path -Parent $PSScriptRoot
 Push-Location -LiteralPath $pslcReleaseRoot
 try {
-    if (Test-Path -LiteralPath '.venv') { throw 'Existing .venv retained. For update follow docs/INSTALL_RELEASE.md.' }
     $pslcPythonArguments=if([System.IO.Path]::GetFileNameWithoutExtension($PythonExecutable) -eq 'py'){@('-3')}else{@()}
-    & $PythonExecutable @pslcPythonArguments scripts/verify_release.py .
-    if ($LASTEXITCODE -ne 0) { throw 'Verify the original extracted release before installing; see START_HERE.md.' }
-    & $PythonExecutable @pslcPythonArguments -m venv .venv
-    if ($LASTEXITCODE -ne 0) { throw 'Python 3.12+ is required.' }
-    & ./.venv/Scripts/python.exe -c "import sys; assert sys.version_info >= (3,12), 'Python 3.12+ is required'"
-    if ($LASTEXITCODE -ne 0) { throw 'Python 3.12+ is required.' }
-    & ./.venv/Scripts/python.exe -m pip install -r requirements.lock.txt
-    if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed; start was not attempted.' }
-    & ./.venv/Scripts/python.exe scripts/setup_dev.py
-    if ($LASTEXITCODE -ne 0) { throw 'Local setup failed.' }
-    Write-Host 'Ready. Run ./scripts/start-release.ps1; open http://127.0.0.1:8787. First login: admin / admin.'
+    & $PythonExecutable @pslcPythonArguments -c "import sys,struct,sysconfig;sys.exit(0 if sys.version_info >= (3,12) and struct.calcsize('P')==8 and sysconfig.get_platform().lower()=='win-amd64' else 2)"
+    if ($LASTEXITCODE -ne 0) { throw 'Python 3.12+ x64 is required. No environment was created.' }
+    $pslcInstallArguments=@('scripts/install_bootstrap.py','--root',$pslcReleaseRoot)
+    if ($Resume) { $pslcInstallArguments+='--resume' }
+    if ($Wheelhouse) { $pslcInstallArguments+=@('--wheelhouse',$Wheelhouse) }
+    & $PythonExecutable @pslcPythonArguments @pslcInstallArguments
+    if ($LASTEXITCODE -ne 0) { throw 'Installation was not completed. Existing files retained; use -Resume only for an owned interrupted installation. See the error code above.' }
+    Write-Host 'Ready. Run ./scripts/start-release.ps1; open http://127.0.0.1:8787. A new empty installation creates admin / admin; existing account passwords are retained.'
 } finally { Pop-Location }

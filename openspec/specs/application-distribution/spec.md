@@ -22,3 +22,22 @@
 #### Scenario: Publication unavailable
 - **WHEN** отсутствует доступ GitHub
 - **THEN** готовые проверенные artifacts доступны локально, конкретный внешний блокер сообщён без потери реализации
+
+### Requirement: DS-004 Recoverable owned installation
+Installer SHALL validate Python3.12+ x64 before creating .venv. Explicit -Resume SHALL require matching installer ownership, root and exact manifest binding, and recheck declared file integrity. Changed, foreign or reparse installations MUST be refused without deleting environments or resetting user .local/config. Interrupted installation SHALL be recoverable; completed resume SHALL stay idempotent with pinned model downloads.
+#### Scenario: Dependency download interrupted
+- **WHEN** pip fails after an owned .venv was created and operator retries with -Resume and unchanged release
+- **THEN** ownership/integrity are rechecked and installation continues; existing configuration is preserved
+#### Scenario: Changed or unrelated installation
+- **WHEN** receipt/marker/manifest/root do not match, a release file changed or .venv is unrelated/reparse
+- **THEN** installer refuses before environment mutation and retains existing files
+#### Scenario: Unsupported interpreter
+- **WHEN** selected interpreter is below3.12 or is not x64
+- **THEN** installer refuses before creating .venv
+#### Scenario: Completed resume
+- **WHEN** the verified owned installation is already complete and -Resume is repeated
+- **THEN** no dependency/setup steps are repeated and user configuration remains unchanged
+
+#### Scenario: Supported model downloads after completion
+- **WHEN** completed Lite installation contains regular GGUF files matching the manifest-bound pinned model catalog, or its bounded .gguf.partial downloads, and -Resume is repeated
+- **THEN** no dependency/setup steps are repeated; arbitrary extra files, reparse paths and changed manifest-declared files including Full weights are still refused

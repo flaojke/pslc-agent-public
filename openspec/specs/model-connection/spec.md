@@ -59,10 +59,19 @@ API key SHALL сохраняться только в защищённом server
 - **THEN** новые обращения не вызывают прежнюю модель и не возвращаются к env fallback
 
 ### Requirement: MC-007 Selectable model profiles
-Admin SHALL переключать активную модель между проверяемыми local catalog моделями и сохранёнными OpenWebUI profiles. Переключение SHALL сохранять остальные profiles/ключи и применять целостный snapshot для новых запросов. UI MUST показывать текущий provider/model и отсутствие готовности без скрытой подмены.
+Admin SHALL переключать активную модель между проверяемыми local catalog моделями и сохранёнными OpenWebUI profiles. Переключение SHALL сохранять остальные profiles/ключи и применять целостный snapshot для новых запросов. UI MUST показывать текущий provider/model и отсутствие готовности без скрытой подмены. В открытом чате индикатор SHALL обновлять metadata; неизвестный статус при отказе MUST не блокировать разрешённый запрос. Это общий выбор для новых запросов, не provenance прошлого ответа.
 #### Scenario: Switch back to local
 - **WHEN** выбран local после OpenWebUI
 - **THEN** ключ OpenWebUI сохранён, новые запросы используют выбранную local модель после проверки файлов
+#### Scenario: Another administrator changes the active model
+- **WHEN** администратор в другом browser context меняет активную модель при открытом чате оператора
+- **THEN** периодический refresh, возврат фокуса и trigger перед сообщением/планом SHALL перечитывать только безопасную metadata и показывать новый глобальный provider/ID без обращения оператора к административной конфигурации
+#### Scenario: Metadata refresh fails
+- **WHEN** безопасный запрос metadata не завершился успешно
+- **THEN** старый ID/CPU не показывается как текущий; ошибка metadata MUST не вводить новый запрет на сообщение/план при неизменных auth/actor/case guards; авторитетные проверки выполняет сервер, после успешного refresh индикатор восстанавливается
+#### Scenario: Selection changes during refresh
+- **WHEN** оператор перешёл в другую беседу либо component/actor изменён до завершения metadata refresh
+- **THEN** поздний refresh MUST не перезаписывать новое состояние после unmount/смены сотрудника и не направлять старый текст в новую беседу
 
 ### Requirement: MC-008 Compatible provider migration
 Новая установка SHALL выбирать local Qwen4B. Upgrade SHALL сохранять прежнюю явно настроенную OpenWebUI модель либо disabled состояние. Невалидная encrypted конфигурация MUST не вызывать автоматический fallback. Существующие metadata schema/УЗ/узловые identities SHALL сохраняться; M6 не понижает текущую schema9.

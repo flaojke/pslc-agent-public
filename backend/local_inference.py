@@ -8,6 +8,7 @@ import httpx,psutil
 from .config import ROOT
 from .store import Problem
 from .integrations import IntegrationError
+from .runtime_process import POLICY_ERROR,policy_launch_error,worker_error
 
 class Cancelled(Exception):pass
 def hash_file(path,cancel=None):
@@ -64,7 +65,7 @@ class LocalModels:
    rows.append({'id':mid,'title':row['title'],'bytes':row['bytes'],'sha256':row['sha256'],'license':row['license'],'state':state,
     'downloaded_bytes':row['bytes'] if ready else job.get('downloaded_bytes',partial.stat().st_size if partial.exists() else 0),'error':job.get('error')})
   with self.lock:
-   if self.process and self.process.poll() is not None and self.runtime_state=='ready':self.runtime_state='failed';self.runtime_error='local_runtime_exited'
+   if self.process and self.process.poll() is not None and self.runtime_state=='ready':self.runtime_state='failed';self.runtime_error=worker_error(self.process.poll(),'local_runtime_exited')
    runtime={'state':self.runtime_state,'model_id':self.running_id,'error':self.runtime_error,'context_tokens':8192,'parallel_generations':1,'queued':self.queued,'cpu_only':True}
   return {'enabled':self.enabled,'default':self.default,'models':rows,'runtime':runtime}
  def request_download(self,mid):
@@ -174,6 +175,29 @@ class LocalModels:
    for child in remaining:
     try:child.kill()
     except psutil.Error:pass
+ def _spawn_owned(self,args,env,mid):
+  kwargs={'creationflags':0x08000000} if os.name=='nt' else {'start_new_session':True}
+  # close() takes the same lock: a newly created worker is always tracked before
+  # shutdown can observe it, including the short-lived version probe.
+  with self.lock:
+   if self.closed.is_set():raise IntegrationError('local_runtime_stopped')
+   process=subprocess.Popen(args,cwd=ROOT,env=env,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,**kwargs)
+   try:birth=psutil.Process(process.pid).create_time()
+   except psutil.Error:birth=None
+   self.process=process;self.process_birth=birth;self.running_id=mid
+  return process
+ def _version_probe(self,args,env,mid):
+  process=self._spawn_owned(args,env,mid)
+  try:
+   deadline=time.monotonic()+6
+   while process.poll() is None:
+    if self.closed.is_set():raise IntegrationError('local_runtime_stopped')
+    if time.monotonic()>=deadline:raise IntegrationError('local_runtime_dependencies')
+    time.sleep(.05)
+   if self.closed.is_set():raise IntegrationError('local_runtime_stopped')
+   if process.returncode:raise IntegrationError(worker_error(process.returncode,'local_runtime_dependencies'))
+  finally:self._stop()
+  with self.lock:self.runtime_state='loading'
  def ensure_running(self,mid):
   if not self.enabled:raise IntegrationError('local_models_disabled')
   if self.closed.is_set():raise IntegrationError('local_runtime_stopped')
@@ -192,19 +216,13 @@ class LocalModels:
    allowed={'PATH','SYSTEMROOT','WINDIR','TEMP','TMP','TMPDIR','HOME','LANG','LC_ALL'}
    env={k:v for k,v in os.environ.items() if k.upper() in allowed};env['LLAMA_API_KEY']=self.token;env['PYTHONIOENCODING']='utf-8'
    if os.name!='nt':env['LD_LIBRARY_PATH']=str(exe.parent.resolve())
-   try:
-    check=subprocess.run([str(exe),'--version'],env=env,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=5,**({'creationflags':0x08000000} if os.name=='nt' else {}))
-    if check.returncode:raise IntegrationError('local_runtime_dependencies')
-   except subprocess.TimeoutExpired:raise IntegrationError('local_runtime_dependencies') from None
-   kwargs={'creationflags':0x08000000} if os.name=='nt' else {'start_new_session':True}
-   process=subprocess.Popen(host,cwd=ROOT,env=env,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,**kwargs)
-   try:birth=psutil.Process(process.pid).create_time()
-   except psutil.Error:birth=None
-   with self.lock:self.process=process;self.process_birth=birth;self.running_id=mid
+   probe=[sys.executable,'-m','backend.runtime_host','--parent',str(parent.pid),'--parent-created',str(parent.create_time()),'--probe',str(exe),'--version']
+   self._version_probe(probe,env,mid)
+   process=self._spawn_owned(host,env,mid)
    deadline=time.monotonic()+90
    with httpx.Client(timeout=2,trust_env=False) as c:
     while time.monotonic()<deadline and not self.closed.is_set():
-     if process.poll() is not None:raise IntegrationError('local_runtime_start_failed')
+     if process.poll() is not None:raise IntegrationError(worker_error(process.poll(),'local_runtime_start_failed'))
      try:
       r=c.get(self.url+'/models',headers={'Authorization':'Bearer '+self.token})
       if r.status_code==200 and any(x.get('id')==mid for x in r.json().get('data',[])):
@@ -214,7 +232,7 @@ class LocalModels:
      time.sleep(.2)
    raise IntegrationError('local_runtime_timeout')
   except (IntegrationError,OSError,Problem) as e:
-   code=str(e) if isinstance(e,IntegrationError) else 'local_runtime_start_failed'
+   code=str(e) if isinstance(e,IntegrationError) else POLICY_ERROR if policy_launch_error(e) else 'local_runtime_start_failed'
    self._stop()
    with self.lock:self.runtime_state='failed';self.runtime_error=code
    raise IntegrationError(code) from None
