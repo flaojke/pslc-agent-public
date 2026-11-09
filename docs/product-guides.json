@@ -32,7 +32,7 @@
         },
         {
           "type": "note",
-          "text": "Full включает проверенные веса Qwen4B, Lite загружает их по кнопке «Настройки → Модели». Код и CPU runtime одинаковы; Full из двух частей собирается assemble_full.py после проверки SHA256. Файлы находятся в Releases приватного репозитория pslc-agent и доступны его участникам. Python dependencies ставятся из package index либо заранее подготовленного wheelhouse; это не автономный exe."
+          "text": "Full включает проверенные веса Qwen4B, Lite загружает их по кнопке «Настройки → Модели». Код и CPU runtime одинаковы; Full из двух частей собирается assemble_full.py после проверки SHA256. Файлы находятся в Releases приватного репозитория pslc-agent и доступны его участникам. Python dependencies ставятся из package index либо заранее подготовленного wheelhouse; это не автономный exe. SourceZIP предназначен для разработки: содержит frontend/index.html, Dockerfiles, lockfiles и готовый web, но runtime/веса/native-bundles берутся из Full/Lite той же версии."
         },
         {
           "type": "steps",

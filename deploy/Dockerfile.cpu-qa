@@ -1,0 +1,2 @@
+FROM pslc-agent-native-qa:0.8.0
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 && rm -rf /var/lib/apt/lists/*

@@ -2,7 +2,7 @@
 from pathlib import Path
 import hashlib,json,sys,zipfile,shutil
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
-from scripts.build_release import collect
+from scripts.build_release import collect,build as build_source
 from scripts.agent_resources import collect_agent_resources
 from backend.local_inference import hash_file
 def build():
@@ -58,7 +58,9 @@ def build():
  assembler=out/'assemble_full.py';shutil.copyfile(ROOT/'scripts/assemble_full.py',assembler);assets.append(assembler)
  readme=out/'DOWNLOADS.md'
  readme.write_text('# PSLC Agent '+version+'\n\nLite: скачайте PSLC-Agent-'+version+'-Lite.zip, распакуйте и следуйте START_HERE.md. CPU runtime включён, Qwen4B загружается по кнопке в «Настройки → Модели».\n\nFull: скачайте все Full.zip.partNN, Full.parts.json и assemble_full.py в одну папку. Выполните python assemble_full.py PSLC-Agent-'+version+'-Full.parts.json. Будет собран проверенный Full.zip. Распакуйте и следуйте START_HERE.md. Веса Qwen4B уже включены; повторная загрузка не требуется.\n\nОба варианта: Python3.12+, одинаковый код и готовый web, CPU runtime Windows/Linuxx64, без пользовательской БД/keys/идентичностей. Установка Python dependencies требует package index либо wheelhouse. SHA256 подтверждает байтовую целостность, не корпоративную подпись. Default admin/admin создаётся один раз. Существующие внешние профили сохраняются при upgrade.\n',encoding='utf-8');assets.append(readme)
- result={'version':version,'code_sha256':code_digest,'packages':packages,'github_assets':[{'name':p.name,'bytes':p.stat().st_size,'sha256':hash_file(p)} for p in assets],'source_contains_weights':False,'production_admitted':False}
+ source_zip=out/('PSLC-Agent-'+version+'-source.zip');source_result=build_source(source_zip,files=base);assets.extend([source_zip,source_zip.with_suffix('.zip.sha256')])
+ with readme.open('a',encoding='utf-8') as f:f.write('\nДля разработки: source.zip и SHA256. В нём исходники, frontend/index.html, Dockerfiles, lockfiles и готовый web; CPU runtime/веса и native-bundles берите из Full/Lite. См.docs/GITHUB_HANDOFF.md.\n')
+ result={'version':version,'source_archive':{'name':source_zip.name,'bytes':source_result['size_bytes'],'sha256':source_result['sha256']},'code_sha256':code_digest,'packages':packages,'github_assets':[{'name':p.name,'bytes':p.stat().st_size,'sha256':hash_file(p)} for p in assets],'source_contains_weights':False,'production_admitted':False}
  (out/'distribution-manifest.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
  print(json.dumps({'version':version,'packages':packages,'github_assets':len(assets),'full_parts':len([p for p in assets if '.part0' in p.name]),'secret_scan':'passed'}),flush=True)
  return result

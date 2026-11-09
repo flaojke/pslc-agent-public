@@ -1,6 +1,6 @@
 # Поставка агента — 0.7.0
 
-Сборка: `.venv/Scripts/python.exe scripts/build_agent.py` на Windows; `docker build -f deploy/Dockerfile.agent -t pslc-agent-native-qa:0.7.0 .` на Linux-контейнере. Native PyInstaller6.22.3, pywin32 312, requirements.agent.txt/requirements.build-windows.lock.txt. `dependency-inventory.json` и licenses входят в подписываемый bundle; это inventory, не аудит уязвимостей. Linux image pinned digest, build context whitelist исключает .local и операторские credentials. SDK Windows ssl.py требует codex-rejected-cas.pem: build включает штатный trust asset, не меняя проверку TLS.
+Сборка: `.venv/Scripts/python.exe scripts/build_agent.py` на Windows; `docker build -f deploy/Dockerfile.agent -t pslc-agent-native-qa:0.8.0 .` на Linux-контейнере. Native PyInstaller6.22.3, pywin32 312, requirements.agent.txt/requirements.build-windows.lock.txt. `dependency-inventory.json` и licenses входят в подписываемый bundle; это inventory, не аудит уязвимостей. Linux image pinned digest, build context whitelist исключает .local и операторские credentials. SDK Windows ssl.py требует codex-rejected-cas.pem: build включает штатный trust asset, не меняя проверку TLS.
 
 API остаётся127.0.0.1:8787. PSLC_TLS_CERT + PSLC_TLS_KEY включают HTTPS; одна половина конфигурации запрещена. Агент --ca-file или ca_file strict config использует системное SSL chain/hostname validation; verify=false нет. HTTP допускается только loopback. mTLS и сетевой production ingress не заявляются реализованными.
 

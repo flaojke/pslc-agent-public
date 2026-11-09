@@ -83,7 +83,7 @@ def create_app(settings: Settings, transport=None, frontend_directory=None):
             await asyncio.to_thread(model_connection.close)
             store.engine.dispose()
 
-    app=FastAPI(title="PSLC Agent",version="0.18.1",lifespan=lifespan,docs_url=None,redoc_url=None,openapi_url=None)
+    app=FastAPI(title="PSLC Agent",version="0.18.2",lifespan=lifespan,docs_url=None,redoc_url=None,openapi_url=None)
     app.state.store=store
     app.state.auth=auth
     app.state.knowledge=knowledge_service
@@ -161,7 +161,7 @@ def create_app(settings: Settings, transport=None, frontend_directory=None):
         return authorization[7:]
 
     @app.get("/healthz")
-    def health(): return {"service":"PSLC Agent","version":"0.18.1","mode":runtime_mode}
+    def health(): return {"service":"PSLC Agent","version":"0.18.2","mode":runtime_mode}
 
     api=APIRouter(prefix="/api",dependencies=[Depends(operator)])
 

@@ -1,6 +1,6 @@
 """Explicitly authorized private GitHub delivery. Credentials only in process RAM via GCM."""
 from pathlib import Path
-import hashlib,json,os,subprocess,sys,time
+import hashlib,json,os,subprocess,sys,time,re
 import httpx
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
@@ -49,7 +49,7 @@ def main():
   assert not set(filter(None,staged))-set(allowed),'Unreviewed staged paths'
   for start in range(0,len(allowed),80):git('add','--',*allowed[start:start+80])
   if git('diff','--cached','--quiet',check=False).returncode:
-   git('commit','-m','Release PSLC Agent 0.18.0: dialogue, recovery, scheduling and local CPU Full/Lite')
+   git('commit','-m','Release PSLC Agent '+version+': verified Full/Lite and complete source')
   sha=git('rev-parse','HEAD').stdout.strip()
   current=git('branch','--show-current').stdout.strip()
   if current!='main':git('branch','-M','main')
@@ -60,13 +60,12 @@ def main():
   exists=git('rev-parse','--verify','refs/tags/'+tag,check=False)
   if exists.returncode:git('tag','-a',tag,'-m','PSLC Agent '+version+' verified local MVP')
   else:
-   assert not git('diff','--name-only',tag,'HEAD','--','backend','agent','frontend/src','config','package.json','pyproject.toml').stdout.strip(),'Existing tag application differs'
+   assert not git('diff','--name-only',tag,'HEAD','--','backend','agent','frontend','config','deploy','scripts','package.json','pyproject.toml','pnpm-lock.yaml','vite.config.ts','tsconfig.json','requirements.lock.txt','requirements.agent.txt','requirements.build-windows.lock.txt','.dockerignore').stdout.strip(),'Existing tag application differs'
    sha=git('rev-list','-n','1',tag).stdout.strip()
   git('push','origin',tag)
   print(json.dumps({'phase':'source_pushed','commit':sha,'tag':tag,'files':len(allowed)}),flush=True)
   notes=(ROOT/('docs/RELEASE_NOTES_'+version+'.md')).read_text(encoding='utf-8')
-  for name in ('VERIFICATION_LOCAL_CPU.md','INSTALL_RELEASE.md','DISTRIBUTION_CONTENTS.md'):
-   notes=notes.replace(']('+name+')','](https://github.com/'+REPO+'/blob/'+tag+'/docs/'+name+')')
+  notes=re.sub(r'\]\(([A-Za-z0-9_.-]+\.md)\)',lambda m:'](https://github.com/'+REPO+'/blob/'+tag+'/docs/'+m[1]+')',notes)
   notes+='\n\n## Скачать\n\nLite: ZIP + .sha256. Full: обе Full.zip.partNN, Full.parts.json и assemble_full.py в одну папку; python assemble_full.py PSLC-Agent-'+version+'-Full.parts.json. Затем распакуйте ZIP, откройте START_HERE.md. Доступ к этим загрузкам требует входа в приватный репозиторий.\n\n## SHA256 поставок\n\n'
   for row in manifest['packages']:notes+='- '+row['variant']+': '+str(row['bytes'])+' bytes; \x60'+row['sha256']+'\x60\n'
   matches=[x for x in api('GET','/repos/'+REPO+'/releases?per_page=100') if x['tag_name']==tag]
@@ -106,7 +105,7 @@ def main():
    a=final_assets[row['name']];assert a['browser_download_url'].startswith('https://github.com/'+REPO+'/releases/download/'+tag+'/')
    assert a.get('digest')=='sha256:'+row['sha256'];row['url']=a['browser_download_url']
   report={'version':version,'repository':repo['html_url'],'private':True,'release':release['html_url'],'tag':tag,'source_commit':sha,'source_files':len(allowed),'weights_in_git':False,'assets':verified,'production_admitted':False}
-  dest=ROOT/'docs/qa/local-model/github-release.json';dest.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+  dest=ROOT/'docs/qa/releases'/version/'github-release.json';dest.parent.mkdir(parents=True,exist_ok=True);dest.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
   print(json.dumps({'phase':'published','repository':repo['html_url'],'release':release['html_url'],'private':True,'assets':len(verified)}),flush=True)
 if __name__=='__main__':
  try:main()

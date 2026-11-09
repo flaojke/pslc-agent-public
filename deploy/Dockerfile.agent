@@ -1,0 +1,11 @@
+FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
+RUN apt-get update && apt-get install -y --no-install-recommends binutils && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY requirements.agent.txt ./
+RUN pip install --no-cache-dir -r requirements.agent.txt
+COPY agent ./agent
+COPY backend ./backend
+COPY scripts/build_agent.py scripts/native_agent_smoke.py ./scripts/
+RUN python scripts/build_agent.py
+RUN python scripts/native_agent_smoke.py artifacts/native/0.8.0/linux-x64/pslc-agent/pslc-agent
+CMD ["/src/artifacts/native/0.8.0/linux-x64/pslc-agent/pslc-agent","--version"]

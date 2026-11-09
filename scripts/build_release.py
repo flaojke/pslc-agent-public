@@ -3,8 +3,45 @@ from pathlib import Path
 import hashlib,json,os,sys,zipfile,re
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
+REQUIRED_BUILD_INPUTS=(
+ 'frontend/index.html','vite.config.ts','tsconfig.json','package.json','pnpm-lock.yaml',
+ 'pyproject.toml','requirements.lock.txt','requirements.agent.txt','requirements.build-windows.lock.txt',
+ 'deploy/Dockerfile.agent','deploy/Dockerfile.cpu-qa','.dockerignore',
+ 'agent/entrypoint.py','agent/__init__.py','scripts/build_agent.py','scripts/native_agent_smoke.py')
+EXPLICIT_INPUTS=(*REQUIRED_BUILD_INPUTS,'.agents/skills/.openspec-target')
+
+def explicit_inputs(root):
+ root=Path(root).resolve();result={}
+ for name in EXPLICIT_INPUTS:
+  p=root/name
+  if p.is_symlink() or not p.resolve().is_relative_to(root):raise ValueError('invalid_build_input:'+name)
+  if not p.is_file():
+   if name in REQUIRED_BUILD_INPUTS:raise ValueError('missing_build_input:'+name)
+   continue
+  result[name]=p.read_bytes()
+ return result
+
+def validate_source_inputs(files):
+ import shlex
+ missing=set(REQUIRED_BUILD_INPUTS)-set(files)
+ if missing:raise ValueError('missing_build_input:'+sorted(missing)[0])
+ for name in ('deploy/Dockerfile.agent','deploy/Dockerfile.cpu-qa'):
+  for line in files[name].decode('utf-8').splitlines():
+   if not line.strip().upper().startswith('COPY '):continue
+   body=line.strip()[5:].strip()
+   if body.startswith('['):args=json.loads(body)
+   else:args=shlex.split(body)
+   if any(a.startswith('--from=') for a in args):continue
+   args=[a for a in args if not a.startswith('--')]
+   for src in args[:-1]:
+    src=src.removeprefix('./').rstrip('/')
+    if not src or src.startswith('/') or '..' in Path(src).parts or ':' in src:raise ValueError('unsafe_docker_copy')
+    if src not in files and not any(p.startswith(src+'/') for p in files):raise ValueError('missing_docker_copy:'+src)
+ return True
+
+
 def collect():
- files={}
+ files=explicit_inputs(ROOT)
  version=json.loads((ROOT/'package.json').read_text(encoding='utf-8'))['version']
  galleries=sorted(p.name for p in (ROOT/'release-dashboards').glob('*_MSK_v'+version) if p.is_dir())
  current_gallery=galleries[-1] if galleries else None
@@ -13,7 +50,7 @@ def collect():
  allowed={'.py','.ps1','.cjs','.js','.md','.json','.yaml','.yml','.ts','.tsx','.css','.html','.png','.svg','.txt','.service','.pem','.sh'}
  for folder in directories:
   for p in (ROOT/folder).rglob('*'):
-   if not p.is_file() or p.suffix not in allowed or p.is_symlink() or any(x in p.parts for x in ('__pycache__','.pytest_cache','node_modules','.local','.git','.venv')):continue
+   if not p.is_file() or p.suffix not in allowed or p.is_symlink() or not p.resolve().is_relative_to(ROOT.resolve()) or any(x in p.parts for x in ('__pycache__','.pytest_cache','node_modules','.local','.git','.venv')):continue
    # No signing keys or local certificates, even inside an allowlisted folder.
    if p.suffix=='.pem':continue
    relative=p.relative_to(ROOT).as_posix();parts=relative.split('/')
@@ -54,10 +91,12 @@ def collect():
  for value in private:
   if value and len(value)>=12 and any(value.encode() in b for b in files.values()):raise ValueError('private_value_in_release')
  if any('/.local/' in n or n.endswith(('.sqlite3','.enc','.key','.env')) for n in files):raise ValueError('private_path_in_release')
+ validate_source_inputs(files)
  return files
-def build(out=None):
+def build(out=None,files=None):
  version=json.loads((ROOT/'package.json').read_text(encoding='utf-8'))['version']
- files=collect()
+ files=dict(collect() if files is None else files)
+ validate_source_inputs(files)
  manifest={'format':'pslc-source-release-v1','version':version,'database_schema':__import__('backend.store',fromlist=['SCHEMA_VERSION']).SCHEMA_VERSION,'agent_version':__import__('agent').__version__,'kind':'local-MVP source distribution with compiled web','production_admitted':False,
   'files':[{'path':name,'size':len(data),'sha256':hashlib.sha256(data).hexdigest()} for name,data in sorted(files.items())]}
  files['release-manifest.json']=json.dumps(manifest,ensure_ascii=False,indent=2).encode()
