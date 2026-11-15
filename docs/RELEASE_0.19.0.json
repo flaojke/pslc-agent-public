@@ -1,0 +1,104 @@
+{
+  "version": "0.19.0",
+  "repository": "https://github.com/flaojke/pslc-agent-public",
+  "visibility": "public",
+  "release": "https://github.com/flaojke/pslc-agent-public/releases/tag/v0.19.0",
+  "tag": "v0.19.0",
+  "source_commit": "31125c54eb4d569612944dd879533a400f25f4d5",
+  "parent": "a669654b56eefc0850ecdeda384dbba5b0256320",
+  "assets": [
+    {
+      "name": "PSLC-Agent-0.19.0-Lite.zip",
+      "bytes": 103420279,
+      "sha256": "19b420bb4f6ab00aaa0a34e0dd1493503af8a61fe0cb2f35bd5563d5d5fd67fe",
+      "id": 752197753,
+      "github_digest_verified": true,
+      "url": "https://github.com/flaojke/pslc-agent-public/releases/download/v0.19.0/PSLC-Agent-0.19.0-Lite.zip"
+    },
+    {
+      "name": "PSLC-Agent-0.19.0-Lite.zip.sha256",
+      "bytes": 94,
+      "sha256": "eef874003d8c2b1c3ff3be76891e4c850521102aa14c228263e8a399ab7573e0",
+      "id": 752198092,
+      "github_digest_verified": true,
+      "url": "https://github.com/flaojke/pslc-agent-public/releases/download/v0.19.0/PSLC-Agent-0.19.0-Lite.zip.sha256"
+    },
+    {
+      "name": "PSLC-Agent-0.19.0-source.zip",
+      "bytes": 939117,
+      "sha256": "17ac1693afdfef7ab1e8367ba51cdb980e1b15104121329a64c1041b0574f0f3",
+      "id": 752198120,
+      "github_digest_verified": true,
+      "url": "https://github.com/flaojke/pslc-agent-public/releases/download/v0.19.0/PSLC-Agent-0.19.0-source.zip"
+    },
+    {
+      "name": "PSLC-Agent-0.19.0-source.zip.sha256",
+      "bytes": 96,
+      "sha256": "29393fb8bf6038fdd9659f1794e0411a49da1314a75ba1a25ac057579a9b9ccc",
+      "id": 752198146,
+      "github_digest_verified": true,
+      "url": "https://github.com/flaojke/pslc-agent-public/releases/download/v0.19.0/PSLC-Agent-0.19.0-source.zip.sha256"
+    },
+    {
+      "name": "DOWNLOADS.md",
+      "bytes": 1336,
+      "sha256": "dec383f115cc75107704947eded14baf285a767f2d59f10d4d0e407f9608a297",
+      "id": 752198163,
+      "github_digest_verified": true,
+      "url": "https://github.com/flaojke/pslc-agent-public/releases/download/v0.19.0/DOWNLOADS.md"
+    },
+    {
+      "name": "distribution-manifest.json",
+      "bytes": 1647,
+      "sha256": "b29adb2580c7b715df8fad8f279e2e1a2b9e5c166d76679e969764be47c262fd",
+      "id": 752198216,
+      "github_digest_verified": true,
+      "url": "https://github.com/flaojke/pslc-agent-public/releases/download/v0.19.0/distribution-manifest.json"
+    },
+    {
+      "name": "VERIFICATION.md",
+      "bytes": 3438,
+      "sha256": "ae2f634cbf48525c65ee851ab94a907d2f443822cfce514f85d9436d395c1490",
+      "id": 752198243,
+      "github_digest_verified": true,
+      "url": "https://github.com/flaojke/pslc-agent-public/releases/download/v0.19.0/VERIFICATION.md"
+    }
+  ],
+  "weights_included": false,
+  "private_history_imported": false,
+  "force_used": false,
+  "production_admitted": false,
+  "anonymous_downloads_verified": true,
+  "release_date": "2026-11-15",
+  "checks": {
+    "focused_tests_passed": 67,
+    "typescript": "PASS",
+    "vite": "PASS",
+    "generated_guides": 4,
+    "clean_install": "PASS",
+    "resume": "PASS",
+    "python": "3.12.14-x64",
+    "pinned_dependencies": 32,
+    "independent_source_web_rebuild": "PASS",
+    "shared_locked_node_dependencies": true,
+    "fresh_node_dependency_install": false,
+    "ui_screens": 13,
+    "mobile_width": {
+      "scroll": 390,
+      "client": 390
+    },
+    "ui_page_errors": 0,
+    "guard_attempts": {
+      "model_download": 0,
+      "runtime_process": 0,
+      "external_request": 0
+    },
+    "owned_qa_processes_stopped": true,
+    "working_state_accessed": false,
+    "state_imported": false,
+    "vm_created": false,
+    "os_security_policy_changed": false,
+    "real_model_download_or_inference_accepted": false,
+    "corporate_environment_accepted": false
+  }
+}
