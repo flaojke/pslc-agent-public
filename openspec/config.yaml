@@ -5,6 +5,7 @@ context: |
   Read accepted technical contracts in openspec/specs and the current code.
   Preserve explicit authorization, scoped execution, independent local opt-ins and fail-closed behavior.
   Raw logs, command output and model context stay in bounded volatile memory.
+  Current release: one install ZIP and SourceZIP without model weights; explicit UI download. Native Windows startup, no VM provisioning.
   Product help is generated from docs/product-guides.json.
   Do not store credentials, local environment evidence or private correspondence in Git.
 rules:

@@ -24,3 +24,6 @@ build/
 docs/qa/
 docs/roadmap/
 release-dashboards/
+
+# Native binaries are release assets, not source.
+/resources/

@@ -1,4 +1,5 @@
 """Truthful local runtime facts; no probes, URLs, DSNs or environment dump."""
+import os,platform
 from .product_guides import variables
 from .store import SCHEMA_VERSION
 from .rbac import capabilities
@@ -7,6 +8,7 @@ def info(settings,store,principal,api_version=None):
  v=variables()
  result={'name':'PSLC Agent','version':api_version or v['version'],'native_agent_version':v['agent_version'],'schema_version':SCHEMA_VERSION,
   'mode':'pilot-network' if settings.pilot_network_admitted else 'local-development',
+  'deployment':{'kind':'linux-vm' if os.getenv('PSLC_DEPLOYMENT_KIND')=='linux-vm' and platform.system()=='Linux' else 'native','server_os':platform.system()},
   'purpose':'Поддержка и администрирование Windows/Linux с подтверждением действий и проверкой результата.',
   'architecture':['Web-интерфейс и диалоги','API, политики и очередь','Локальный CPU LLM или OpenWebUI','Узловой Windows/Linux native агент','SQLite/PostgreSQL: только метаданные'],
   'limits':{'session':5,'fleet':20,'devices':500,'api_processes':1},
@@ -14,7 +16,7 @@ def info(settings,store,principal,api_version=None):
    {'name':'Беседы и планы с подтверждением','status':'implemented','detail':'Чужой временный контекст закрыт; ответ модели требует проверки.'},
    {'name':'Управление Windows/Linux','status':'implemented','detail':'Возможности узла отдельно включаются локально и на сервере.'},
    {'name':'Поиск сети и ZIP агента','status':'implemented','detail':'Явный private IPv4 CIDR; кандидат требует enrollment.'},
-   {'name':'CPU Qwen и OpenWebUI','status':'implemented','detail':'Qwen4B CPU и чистые Full/Lite проверены: JSON, план, подтверждение, native health. Корпоративный OpenWebUI и качество произвольных задач требуют внешней приёмки.'},
+   {'name':'CPU Qwen и OpenWebUI','status':'implemented','detail':'Веса локальных моделей не входят в поставку: скачайте нужную модель кнопкой в «Настройки → Модели». Ранее скачанные файлы и сохранённые подключения сохраняются, выбор выполняется явно. Целые GGUF не означают успешный запуск: проверьте runtime и JSON. Windows-приложение запускается нативно. При запрете локального runtime администратор может явно выбрать сохранённый профиль OpenWebUI и проверить подключение; автоматического переключения нет. Корпоративный OpenWebUI и качество задач требуют отдельной приёмки.'},
    {'name':'Откат задачи','status':'implemented','detail':'Пара действий, локальный зашифрованный baseline и ручное восстановление объявленных ресурсов. Windows standalone / Linux container проверены; службы требуют внешней приёмки.'},
    {'name':'Планировщик','status':'implemented','detail':'Accounts-only календари, согласие на точный шаблон, fresh scopes, история без catch-up. Промпты требуют нового решения по плану.'},
    {'name':'AD/SSO и Confluence','status':'deferred','detail':'Отложены пользователем, не блокируют локальные УЗ.'},

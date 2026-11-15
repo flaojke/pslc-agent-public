@@ -19,6 +19,12 @@ Global admin SHALL запускать/отменять/повторять заг
 #### Scenario: Non admin
 - **WHEN** другой сотрудник вызывает download/cancel
 - **THEN**403 без загрузки или изменения файлов
+#### Scenario: Startup does not download
+- **WHEN** приложение запущено/перезапущено или выбран local catalog ID без готового файла
+- **THEN** status остаётся missing/не готов; download HTTP не начинается до явного admin действия, прежние saved provider profiles не меняются
+#### Scenario: Explicit download remains available
+- **WHEN** global admin нажимает Скачать у выбранной локальной модели
+- **THEN** прежние pinned integrity/progress/cancel/retry и независимый выбор модели сохраняются; verified веса сами по себе не доказывают runtime readiness
 
 ### Requirement: LI-003 Owned CPU runtime
 Система SHALL управлять собственным CPU runtime, bind только loopback с приватным ключом, bounded context8192 и явным статусом загрузки/готовности/ошибки. Stop/restart/crash владельца SHALL завершать его child runtime; чужие процессы MUST не останавливаться. Raw prompts/ответы/runtime stdout MUST не сохраняться в файлы.
